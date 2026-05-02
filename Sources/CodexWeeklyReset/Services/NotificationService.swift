@@ -13,6 +13,7 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
   init(center: UNUserNotificationCenter = .current()) {
     self.center = center
     super.init()
+    center.delegate = self
   }
 
   func authorizationStatus() async -> NotificationPermissionState {
@@ -50,6 +51,15 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
         continuation.resume(returning: settings)
       }
     }
+  }
+}
+
+extension SystemNotificationService: UNUserNotificationCenterDelegate {
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification
+  ) async -> UNNotificationPresentationOptions {
+    [.banner, .list, .sound]
   }
 }
 

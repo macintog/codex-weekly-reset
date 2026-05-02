@@ -2,122 +2,184 @@ import SwiftUI
 
 struct StatusPopoverView: View {
   @ObservedObject var monitor: LimitMonitor
+  private let projectURL = URL(string: "https://github.com/macintog/codex-weekly-reset")!
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      header
+    ZStack(alignment: .topTrailing) {
+      VStack(alignment: .leading, spacing: 14) {
+        header
 
-      Divider()
+        statusItems
 
-      details
+        if let lastError = monitor.lastError {
+          Text(lastError)
+            .font(.caption)
+            .foregroundStyle(.red)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("lastErrorValue")
+        }
 
-      if let lastError = monitor.lastError {
-        Text(lastError)
-          .font(.caption)
-          .foregroundStyle(.red)
-          .fixedSize(horizontal: false, vertical: true)
-          .accessibilityIdentifier("lastErrorValue")
+        controls
       }
+      .padding(18)
 
-      controls
+      Button {
+        NSWorkspace.shared.open(projectURL)
+      } label: {
+        Image(systemName: "info.circle")
+          .font(.system(size: 15, weight: .regular))
+          .foregroundStyle(.secondary)
+          .frame(width: 24, height: 24)
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("projectInfoButton")
+      .accessibilityLabel("Open GitHub project page")
+      .help("Open GitHub project page")
+      .padding(.top, 16)
+      .padding(.trailing, 18)
     }
-    .padding(16)
-    .frame(width: 306)
+    .frame(width: 386)
   }
 
   @ViewBuilder
   private var header: some View {
-    switch monitor.state {
-    case .idle, .loading:
-      HStack(spacing: 14) {
-        LimitRingView(percent: nil)
-        VStack(alignment: .leading, spacing: 4) {
-          Text("Checking")
-            .font(.system(size: 28, weight: .semibold, design: .rounded))
-          Text("Codex weekly limit")
-            .foregroundStyle(.secondary)
+    Group {
+      switch monitor.state {
+      case .idle, .loading:
+        HStack(spacing: 18) {
+          LimitRingView(percent: nil)
+          VStack(alignment: .leading, spacing: 4) {
+            Text("Checking")
+              .font(.system(size: 34, weight: .semibold, design: .rounded))
+            Text("Codex weekly limit")
+              .font(.title3.weight(.semibold))
+              .foregroundStyle(.secondary)
+          }
         }
-      }
-    case let .ready(snapshot):
-      HStack(spacing: 14) {
-        LimitRingView(percent: snapshot.remainingPercent)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(DisplayFormatters.percentage(snapshot.remainingPercent))
-            .font(.system(size: 38, weight: .bold, design: .rounded))
-            .monospacedDigit()
-            .accessibilityIdentifier("weeklyRemainingValue")
-          Text("weekly remaining")
-            .font(.callout)
-            .foregroundStyle(.secondary)
+      case let .ready(snapshot):
+        HStack(spacing: 18) {
+          LimitRingView(percent: snapshot.remainingPercent)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(DisplayFormatters.percentage(snapshot.remainingPercent))
+              .font(.system(size: 38, weight: .bold, design: .rounded))
+              .monospacedDigit()
+              .fixedSize(horizontal: true, vertical: false)
+              .accessibilityIdentifier("weeklyRemainingValue")
+            Text("weekly remaining")
+              .font(.system(size: 20, weight: .medium, design: .rounded))
+              .foregroundStyle(.secondary)
+          }
+          Spacer(minLength: 20)
         }
-      }
-    case .failed:
-      HStack(spacing: 14) {
-        Image(systemName: "exclamationmark.triangle.fill")
-          .font(.system(size: 34))
-          .foregroundStyle(.orange)
-          .frame(width: 72, height: 72)
-        VStack(alignment: .leading, spacing: 4) {
-          Text("Unavailable")
-            .font(.system(size: 28, weight: .semibold, design: .rounded))
-          Text("Codex limit check failed")
-            .foregroundStyle(.secondary)
+      case .failed:
+        HStack(spacing: 18) {
+          Image(systemName: "exclamationmark.triangle.fill")
+            .font(.system(size: 42))
+            .foregroundStyle(.orange)
+            .frame(width: 72, height: 72)
+          VStack(alignment: .leading, spacing: 4) {
+            Text("Unavailable")
+              .font(.system(size: 34, weight: .semibold, design: .rounded))
+            Text("Codex limit check failed")
+              .font(.title3.weight(.semibold))
+              .foregroundStyle(.secondary)
+          }
         }
       }
     }
+    .padding(.bottom, 8)
   }
 
-  private var details: some View {
-    VStack(spacing: 9) {
-      detailRow("Reset", value: resetText, id: "resetTimeValue")
-      detailRow("Last check", value: lastCheckText, id: "lastCheckValue")
-      detailRow("Source", value: sourceText, id: "sourcePathValue")
-      detailRow("Notifications", value: monitor.notificationState.displayName, id: "notificationStateValue")
-      detailRow("Build", value: monitor.buildIdentity.displayText, id: "buildIdentityValue")
+  private var statusItems: some View {
+    VStack(alignment: .leading, spacing: 13) {
+      statusItem(
+        symbol: "calendar",
+        tint: .green,
+        title: resetText,
+        id: "resetTimeValue"
+      )
+      statusItem(
+        symbol: "folder",
+        tint: .blue,
+        title: sourceText,
+        id: "sourcePathValue",
+        accessibilityValue: monitor.sourcePath
+      )
+      statusItem(
+        symbol: "bell",
+        tint: .green,
+        title: "Notifications \(monitor.notificationState.displayName)",
+        id: "notificationStateValue"
+      )
+      statusItem(
+        symbol: "hammer",
+        tint: .secondary,
+        title: monitor.buildIdentity.displayText,
+        id: "buildIdentityValue"
+      )
+
+      if monitor.shouldShowLastCheck() {
+        statusItem(
+          symbol: "clock.badge.exclamationmark",
+          tint: .orange,
+          title: "Last checked \(lastCheckText)",
+          id: "lastCheckValue"
+        )
+      }
     }
   }
 
   private var controls: some View {
-    HStack(spacing: 8) {
-      NativeActionButton(
-        title: "Refresh",
-        systemImage: "arrow.clockwise",
-        accessibilityIdentifier: "refreshButton",
-        isEnabled: !monitor.isRefreshing
-      ) {
+    HStack {
+      Button {
         monitor.refreshNow()
+      } label: {
+        Image(systemName: "arrow.clockwise")
+          .font(.system(size: 23, weight: .medium))
+          .frame(width: 32, height: 28)
       }
-      .frame(width: 112, height: 28)
+      .buttonStyle(.plain)
+      .disabled(monitor.isRefreshing)
+      .accessibilityIdentifier("refreshButton")
+      .accessibilityLabel("Refresh")
+      .help("Refresh")
 
       Spacer()
 
-      NativeActionButton(
-        title: "Quit",
-        systemImage: "power",
-        accessibilityIdentifier: "quitButton",
-        isEnabled: true
-      ) {
+      Button {
         monitor.quit()
+      } label: {
+        Text("Quit")
+          .font(.system(size: 18, weight: .semibold, design: .rounded))
+          .foregroundStyle(.red)
       }
-      .frame(width: 86, height: 28)
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("quitButton")
+      .accessibilityLabel("Quit")
     }
   }
 
-  private func detailRow(_ title: String, value: String, id: String) -> some View {
-    HStack(alignment: .firstTextBaseline, spacing: 12) {
+  private func statusItem(
+    symbol: String,
+    tint: Color,
+    title: String,
+    id: String,
+    accessibilityValue: String? = nil
+  ) -> some View {
+    HStack(spacing: 13) {
+      Image(systemName: symbol)
+        .font(.system(size: 19, weight: .regular))
+        .foregroundStyle(tint)
+        .frame(width: 24, height: 24)
+
       Text(title)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .frame(width: 78, alignment: .leading)
-      Text(value)
-        .font(.caption)
+        .font(.system(size: 18, weight: .regular, design: .rounded))
         .lineLimit(1)
         .truncationMode(.middle)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel(title)
-        .accessibilityValue(rawDetailValue(for: id, displayValue: value))
         .accessibilityIdentifier(id)
-        .help(rawDetailValue(for: id, displayValue: value))
+        .accessibilityValue(accessibilityValue ?? title)
+        .help(accessibilityValue ?? title)
     }
   }
 
@@ -125,7 +187,7 @@ struct StatusPopoverView: View {
     guard let snapshot = monitor.state.snapshot else {
       return "--"
     }
-    return DisplayFormatters.reset.string(from: snapshot.resetsAt)
+    return "Resets \(DisplayFormatters.resetDayAndTime.string(from: snapshot.resetsAt))"
   }
 
   private var lastCheckText: String {
@@ -136,14 +198,10 @@ struct StatusPopoverView: View {
   }
 
   private var sourceText: String {
-    DisplayFormatters.sourceLabel(monitor.sourcePath)
-  }
-
-  private func rawDetailValue(for id: String, displayValue: String) -> String {
-    if id == "sourcePathValue" {
-      return monitor.sourcePath
+    if monitor.sourcePath.hasSuffix(".app") || monitor.sourcePath.contains(".app/") {
+      return "Codex.app"
     }
 
-    return displayValue
+    return DisplayFormatters.sourceLabel(monitor.sourcePath)
   }
 }

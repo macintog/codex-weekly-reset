@@ -68,6 +68,7 @@ final class LimitMonitor: ObservableObject {
       await refresh(trigger: .startup)
       startPolling()
     }
+
   }
 
   func refreshNow() {
@@ -81,6 +82,14 @@ final class LimitMonitor: ObservableObject {
       await client?.stop()
       NSApplication.shared.terminate(nil)
     }
+  }
+
+  func shouldShowLastCheck(now: Date = Date()) -> Bool {
+    guard let snapshot = state.snapshot else {
+      return false
+    }
+
+    return now.timeIntervalSince(snapshot.checkedAt) >= configuration.pollInterval * 2
   }
 
   private func startPolling() {
@@ -218,6 +227,7 @@ final class LimitMonitor: ObservableObject {
     previousSnapshot = snapshot
     state = .ready(snapshot)
   }
+
 }
 
 enum RefreshTrigger {

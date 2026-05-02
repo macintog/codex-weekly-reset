@@ -157,7 +157,18 @@ h1 {
   position: relative;
   z-index: 1;
   display: flex;
+  width: 100%;
+  min-width: 0;
   justify-content: center;
+}
+
+.app-preview-image {
+  display: block;
+  width: auto;
+  max-width: min(100%, 640px);
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 30px 80px var(--shadow);
 }
 
 .desktop-frame {
@@ -282,6 +293,33 @@ h1 {
   top: 26px;
 }
 
+.codex-menu-extra {
+  display: grid;
+  width: 42px;
+  height: 54px;
+  place-items: center;
+  margin-left: -16px;
+}
+
+.codex-menu-extra svg {
+  width: 31px;
+  height: 31px;
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.codex-menu-extra path:first-child {
+  fill: rgba(255, 255, 255, 0.95);
+  stroke-width: 0;
+}
+
+.codex-menu-extra path:last-child {
+  stroke: rgba(31, 31, 31, 0.98);
+  stroke-width: 1.7;
+}
+
 .wifi-icon {
   position: relative;
   width: 34px;
@@ -372,9 +410,9 @@ h1 {
   z-index: 2;
   top: 82px;
   left: 10px;
-  width: calc(100% - 20px);
-  min-height: 500px;
-  padding: 25px 32px 34px;
+  width: 560px;
+  min-height: 434px;
+  padding: 26px 34px 22px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 8px;
   background: rgba(36, 36, 36, 0.96);
@@ -382,16 +420,34 @@ h1 {
   backdrop-filter: blur(28px) saturate(1.4);
 }
 
+.popover-info {
+  position: absolute;
+  top: 26px;
+  right: 30px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.48);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+}
+
 .popover-header {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 22px;
+  padding-bottom: 22px;
 }
 
 .quota-ring {
   position: relative;
-  width: 160px;
-  height: 160px;
+  width: 118px;
+  height: 118px;
   flex: 0 0 auto;
 }
 
@@ -405,7 +461,7 @@ h1 {
 .quota-track,
 .quota-fill {
   fill: none;
-  stroke-width: 14;
+  stroke-width: 8;
 }
 
 .quota-track {
@@ -415,14 +471,14 @@ h1 {
 .quota-fill {
   stroke: var(--green);
   stroke-linecap: round;
-  stroke-dasharray: 158 415;
-  transform: rotate(-90deg);
-  transform-origin: 80px 80px;
+  stroke-dasharray: 74.4 201.1;
+  transform: rotate(-82.8deg);
+  transform-origin: 36px 36px;
 }
 
 .quota-value {
   margin: 0;
-  font-size: 74px;
+  font-size: 76px;
   line-height: 1;
   font-weight: 800;
   letter-spacing: 0;
@@ -432,47 +488,59 @@ h1 {
 .quota-label {
   margin: 10px 0 0;
   color: var(--muted);
-  font-size: 22px;
-  font-weight: 650;
+  font-size: 32px;
+  line-height: 1.18;
+  font-weight: 520;
 }
 
-.divider {
-  height: 1px;
-  margin: 20px 0 26px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.detail-list {
+.status-list {
   display: grid;
-  gap: 18px;
+  gap: 21px;
   margin: 0;
 }
 
-.detail-list div {
-  display: grid;
-  grid-template-columns: 164px 1fr;
-  gap: 16px;
-  align-items: baseline;
-}
-
-.detail-list dt,
-.detail-list dd {
-  margin: 0;
-  font-size: 21px;
-  line-height: 1.25;
-  font-weight: 720;
-}
-
-.detail-list dt {
-  color: var(--muted);
-}
-
-.detail-list dd {
-  overflow: hidden;
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 25px;
+  min-width: 0;
   color: rgba(255, 255, 255, 0.9);
-  font-weight: 760;
-  text-overflow: ellipsis;
+  font-size: 32px;
+  line-height: 1.12;
+  font-weight: 430;
+  letter-spacing: 0;
   white-space: nowrap;
+}
+
+.status-symbol {
+  display: block;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  color: var(--green);
+}
+
+.status-symbol.blue {
+  color: #0a84ff;
+}
+
+.status-symbol.muted {
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.status-symbol svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.status-symbol .dot-grid {
+  stroke-width: 3.1;
 }
 
 .popover-controls {
@@ -480,26 +548,56 @@ h1 {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-top: 38px;
+  margin-top: 24px;
 }
 
 .popover-controls button {
-  height: 40px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  height: 38px;
+  padding: 0;
+  border: 0;
   color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.27);
+  background: transparent;
   font: inherit;
-  font-size: 23px;
+  line-height: 1;
+}
+
+.refresh-control {
+  position: relative;
+  width: 42px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.refresh-control span {
+  display: none;
+}
+
+.refresh-control::before {
+  position: absolute;
+  inset: 2px;
+  content: "";
+  border: 4px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  transform: rotate(-22deg);
+}
+
+.refresh-control::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  content: "";
+  border-top: 4px solid currentColor;
+  border-right: 4px solid currentColor;
+  transform: rotate(18deg);
+}
+
+.quit-control {
+  width: auto;
+  color: var(--red) !important;
+  font-size: 28px;
   font-weight: 760;
-}
-
-.popover-controls button:first-child {
-  width: 224px;
-}
-
-.popover-controls button:last-child {
-  width: 172px;
 }
 
 .proof-strip {
@@ -555,21 +653,76 @@ h1 {
   line-height: 1.45;
 }
 
-.site-footer {
-  position: relative;
-  z-index: 1;
-  padding: 0 0 34px;
-  color: var(--faint);
-  font-size: 13px;
-}
-
-.site-footer a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.site-footer a:hover {
+.github-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: min(100%, 342px);
+  min-height: 46px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
   color: var(--text);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.github-card:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.055));
+  transform: translateY(-1px);
+}
+
+.github-mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.github-mark svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.github-avatar {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.github-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.github-eyebrow {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.github-repo {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-arrow {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 17px;
 }
 
 code {
@@ -604,6 +757,11 @@ code {
 
   .hero-visual {
     justify-content: flex-start;
+  }
+
+  .app-preview-image {
+    width: 100%;
+    max-width: 640px;
   }
 
   .desktop-frame {
@@ -658,6 +816,11 @@ code {
     border-radius: 18px;
   }
 
+  .app-preview-image {
+    width: calc(100vw - 28px);
+    max-width: calc(100vw - 28px);
+  }
+
   .menu-date {
     display: none;
   }
@@ -677,8 +840,8 @@ code {
     top: 76px;
     right: auto;
     left: 12px;
-    width: 600px;
-    min-height: 500px;
+    width: 560px;
+    min-height: 434px;
     transform: scale(0.56);
     transform-origin: top left;
   }

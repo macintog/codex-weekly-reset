@@ -15,6 +15,12 @@ enum DisplayFormatters {
     return formatter
   }()
 
+  static let resetDayAndTime: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "EEEE 'at' h:mm a"
+    return formatter
+  }()
+
   static func percentage(_ value: Double) -> String {
     "\(Int(value.rounded()))%"
   }

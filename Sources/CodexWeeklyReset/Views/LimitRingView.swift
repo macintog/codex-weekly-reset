@@ -26,6 +26,12 @@ struct LimitRingView: View {
     }
   }
 
+  private var capAlignmentDegrees: Double {
+    let radius = max(1, (size - lineWidth) / 2)
+    let radians = Double((lineWidth / 2) / radius)
+    return radians * 180 / .pi
+  }
+
   var body: some View {
     ZStack {
       Circle()
@@ -37,7 +43,7 @@ struct LimitRingView: View {
           color.gradient,
           style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
         )
-        .rotationEffect(.degrees(-90))
+        .rotationEffect(.degrees(-90 + capAlignmentDegrees))
     }
     .frame(width: size, height: size)
     .accessibilityIdentifier("weeklyRemainingRing")
