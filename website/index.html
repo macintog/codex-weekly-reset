@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Codex Weekly Reset</title>
+  <meta name="description" content="A compact macOS menu bar utility for watching your Codex rate limits remaining.">
+  <link rel="icon" href="assets/app-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="site-shell">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <div class="product-lockup" aria-label="Codex Weekly Reset">
+          <img src="assets/app-icon.png" alt="" class="app-icon">
+          <span>Codex Weekly Reset</span>
+        </div>
+
+        <p class="eyebrow">Native macOS menu bar utility</p>
+        <h1 id="hero-title">Know your weekly Codex rate limits at a glance.</h1>
+        <p class="lede">A small, quiet status check for Codex rate limits remaining. No dashboard sprawl. No private cache reading. Just the app-server truth in your menu bar.</p>
+
+        <div class="actions" aria-label="Primary links">
+          <a class="button button-primary" href="https://github.com/macintog/codex-weekly-reset/releases/latest">Download for macOS</a>
+          <a class="button button-secondary" href="https://github.com/macintog/codex-weekly-reset">View source</a>
+        </div>
+      </div>
+
+      <div class="hero-visual" aria-label="App interface preview">
+        <div class="desktop-frame">
+          <div class="menu-bar">
+            <span class="selected-menu-extra" aria-label="Codex Weekly Reset menu bar icon">
+              <span class="menu-glyph" aria-hidden="true">
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+              </span>
+            </span>
+            <span class="menu-spacer"></span>
+            <span class="wifi-icon" aria-hidden="true"></span>
+            <span class="search-icon" aria-hidden="true"></span>
+            <span class="control-center-icon" aria-hidden="true">
+              <span></span><span></span>
+            </span>
+            <span class="menu-date">Tue 9:41 AM</span>
+          </div>
+
+          <div class="popover">
+            <div class="popover-header">
+              <div class="quota-ring" aria-hidden="true">
+                <svg viewBox="0 0 160 160" focusable="false">
+                  <circle class="quota-track" cx="80" cy="80" r="66"></circle>
+                  <circle class="quota-fill" cx="80" cy="80" r="66"></circle>
+                </svg>
+              </div>
+              <div>
+                <p class="quota-value">38%</p>
+                <p class="quota-label">weekly remaining</p>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <dl class="detail-list">
+              <div>
+                <dt>Reset</dt>
+                <dd>May 5, 2026 at 9:10 AM</dd>
+              </div>
+              <div>
+                <dt>Last check</dt>
+                <dd>6:27 PM</dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd>/opt/homebrew/bin/codex</dd>
+              </div>
+              <div>
+                <dt>Notifications</dt>
+                <dd>Allowed</dd>
+              </div>
+              <div>
+                <dt>Build</dt>
+                <dd>v0.1.0 (76)</dd>
+              </div>
+            </dl>
+
+            <div class="popover-controls">
+              <button type="button"><span aria-hidden="true">↻</span> Refresh</button>
+              <button type="button"><span aria-hidden="true">⏻</span> Quit</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="proof-strip" aria-label="Product principles">
+      <article>
+        <span class="strip-marker green"></span>
+        <h2>Checks every five minutes</h2>
+        <p>Refreshes rate limits remaining quietly through <code>codex app-server</code>.</p>
+      </article>
+      <article>
+        <span class="strip-marker yellow"></span>
+        <h2>Warns when limits are low</h2>
+        <p>Sends a macOS notification when rate limits remaining get tight.</p>
+      </article>
+      <article>
+        <span class="strip-marker red"></span>
+        <h2>Catches limit resets</h2>
+        <p>Notifies whenever limits reset or capacity comes back. Thanks Tibo.</p>
+      </article>
+    </section>
+
+    <footer class="site-footer">
+      <a href="https://github.com/macintog/">github.com/macintog/</a>
+    </footer>
+  </main>
+</body>
+</html>
