@@ -2,6 +2,8 @@
 
 A tiny macOS menu bar app for answering two important questions: how much weekly Codex rate-limit capacity do you have left, and when did Tibo reset it?
 
+![Codex Weekly Reset website showing the app preview and download button](website/assets/codex-weekly-reset-website.png)
+
 It sits up top with a little ring and a percentage, so you can glance at your remaining weekly Codex capacity without opening the app, running a command, or doing the sad mental math yourself. It’s not trying to be a control center. It’s more like a kitchen timer for your AI budget.
 
 The reset notifications are the real magic trick: leave it running, and it can nudge you when capacity comes back instead of making you check manually like a person living in a spreadsheet. It also warns you when you’re getting low, when you’re nearly out, and when the tank hits empty.
