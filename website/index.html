@@ -5,32 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>Codex Weekly Reset</title>
-  <meta name="description" content="A compact macOS menu bar utility for watching your Codex rate limits remaining.">
+  <meta name="description" content="A tiny macOS menu bar app for seeing how much of your Codex weekly rate limits is left and getting notified when limits reset.">
+  <link rel="canonical" href="https://macintog.github.io/codex-weekly-reset/">
+  <meta property="og:title" content="Codex Weekly Reset">
+  <meta property="og:description" content="A tiny macOS menu bar app for seeing how much of your Codex weekly rate limits is left.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://macintog.github.io/codex-weekly-reset/">
+  <meta property="og:image" content="https://macintog.github.io/codex-weekly-reset/assets/codex-weekly-reset-popover.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#090a0c">
   <link rel="icon" href="assets/app-icon.png">
+  <link rel="apple-touch-icon" href="assets/app-icon.png">
+  <link rel="preload" href="assets/codex-weekly-reset-popover.png" as="image">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="site-shell">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <div class="product-lockup" aria-label="Codex Weekly Reset">
-          <img src="assets/app-icon.png" alt="" class="app-icon">
+        <a class="product-lockup" href="https://github.com/macintog/codex-weekly-reset" aria-label="Codex Weekly Reset on GitHub">
+          <img src="assets/app-icon.png" width="42" height="42" alt="" class="app-icon">
           <span>Codex Weekly Reset</span>
-        </div>
+        </a>
 
         <p class="eyebrow">Native macOS menu bar utility</p>
-        <h1 id="hero-title">Know your weekly Codex rate limits at a glance.</h1>
-        <p class="lede">A small, quiet status check for Codex rate limits remaining. No dashboard sprawl. No private cache reading. Just the app-server truth in your menu bar.</p>
+        <h1 id="hero-title">Codex weekly rate limits, at a glance.</h1>
+        <p class="lede">A small, quiet status check for the thing heavy Codex users actually wonder about: remaining weekly capacity, when it resets, and whether it came back while you were doing something else.</p>
 
         <div class="actions" aria-label="Primary links">
-          <a class="button button-primary" href="downloads/CodexWeeklyReset.zip">Download for macOS</a>
+          <a class="button button-primary" href="downloads/CodexWeeklyReset.zip" download>Download for macOS</a>
           <a class="github-card" href="https://github.com/macintog/codex-weekly-reset" aria-label="View Codex Weekly Reset on GitHub">
             <span class="github-mark" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false">
                 <path d="M12 .7a11.3 11.3 0 0 0-3.6 22c.6.1.8-.2.8-.6v-2.1c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.2-1.6-1.2-1.6-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 .1.7 2.2 3.2 1.6.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.6 0-1.2.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3 0 0 .9-.3 3.1 1.2.9-.2 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.1-1.2 3.1-1.2.6 1.5.2 2.7.1 3 .7.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.3-5.3 5.6.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A11.3 11.3 0 0 0 12 .7z"></path>
               </svg>
             </span>
-            <img class="github-avatar" src="https://github.com/macintog.png?size=80" alt="">
             <span class="github-copy">
               <span class="github-eyebrow">View on GitHub</span>
               <span class="github-repo">macintog/codex-weekly-reset</span>
@@ -38,31 +47,41 @@
             <span class="github-arrow" aria-hidden="true">↗</span>
           </a>
         </div>
+
+        <ul class="trust-list" aria-label="Release details">
+          <li>Signed and notarized for macOS</li>
+          <li>Reads live limits through <code>codex app-server</code></li>
+          <li>No private cache scraping</li>
+        </ul>
       </div>
 
-      <div class="hero-visual" aria-label="App interface preview">
-        <img class="app-preview-image" src="assets/codex-weekly-reset-popover.png" alt="Codex Weekly Reset popover showing 37% weekly remaining">
-      </div>
+      <figure class="hero-visual">
+        <img class="app-preview-image" src="assets/codex-weekly-reset-popover.png" width="824" height="710" alt="Codex Weekly Reset popover showing 37% weekly remaining, reset time, source, notifications, and build information">
+        <figcaption>Actual menu bar popover.</figcaption>
+      </figure>
     </section>
 
-    <section class="proof-strip" aria-label="Product principles">
+    <section class="proof-strip" aria-label="What it does">
       <article>
-        <span class="strip-marker green"></span>
-        <h2>Checks every five minutes</h2>
-        <p>Refreshes rate limits remaining quietly through <code>codex app-server</code>.</p>
+        <span class="strip-marker green" aria-hidden="true"></span>
+        <h2>Glance once</h2>
+        <p>The menu bar shows your remaining weekly Codex capacity without opening Codex or running a command.</p>
       </article>
       <article>
-        <span class="strip-marker yellow"></span>
-        <h2>Warns when limits are low</h2>
-        <p>Sends a macOS notification when rate limits remaining get tight.</p>
+        <span class="strip-marker yellow" aria-hidden="true"></span>
+        <h2>Get nudged</h2>
+        <p>macOS notifications tell you when capacity gets low, runs out, or comes back after a reset.</p>
       </article>
       <article>
-        <span class="strip-marker red"></span>
-        <h2>Catches limit resets</h2>
-        <p>Notifies whenever limits reset or capacity comes back. Thanks,Tibo!</p>
+        <span class="strip-marker red" aria-hidden="true"></span>
+        <h2>Trust the number</h2>
+        <p>The app asks Codex for live rate-limit data. If that read fails, it says so instead of pretending.</p>
       </article>
     </section>
-
   </main>
+
+  <footer class="site-footer">
+    <p>This is an independent utility. It is not affiliated with, endorsed by, or supported by OpenAI.</p>
+  </footer>
 </body>
 </html>
