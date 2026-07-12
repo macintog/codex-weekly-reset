@@ -22,6 +22,23 @@ final class RateLimitTests: XCTestCase {
     XCTAssertEqual(snapshot.checkedAt, checkedAt)
   }
 
+  func testParsesMainCodexWeeklyBucketWhenWeeklyWindowIsPrimary() throws {
+    let envelope = try decodeEnvelope("""
+    {"rateLimits":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":10080,"resetsAt":1784487538},"secondary":null,"credits":{"hasCredits":false,"unlimited":false,"balance":"0"},"individualLimit":null,"planType":"pro","rateLimitReachedType":null},"rateLimitsByLimitId":{"codex":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":10080,"resetsAt":1784487538},"secondary":null,"credits":{"hasCredits":false,"unlimited":false,"balance":"0"},"individualLimit":null,"planType":"pro","rateLimitReachedType":null}}}
+    """)
+
+    let snapshot = try RateLimitSnapshot.mainCodexWeekly(
+      from: envelope,
+      sourcePath: "/Applications/Codex.app/Contents/Resources/codex"
+    )
+
+    XCTAssertEqual(snapshot.limitId, "codex")
+    XCTAssertEqual(snapshot.remainingPercent, 97, accuracy: 0.001)
+    XCTAssertEqual(snapshot.usedPercent, 3, accuracy: 0.001)
+    XCTAssertEqual(snapshot.windowDurationMins, 10080)
+    XCTAssertEqual(snapshot.planType, "pro")
+  }
+
   func testPrefersMainCodexOverModelSpecificBucket() throws {
     let envelope = try decodeEnvelope("""
     {"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":1,"windowDurationMins":300,"resetsAt":10},"secondary":{"usedPercent":20,"windowDurationMins":10080,"resetsAt":20}},"codex_model":{"limitId":"codex_model","limitName":"Model","primary":{"usedPercent":1,"windowDurationMins":300,"resetsAt":10},"secondary":{"usedPercent":90,"windowDurationMins":10080,"resetsAt":20}}}}
@@ -188,8 +205,8 @@ final class RateLimitTests: XCTestCase {
                         "codex": {
                             "limitId": "codex",
                             "limitName": None,
-                            "primary": {"usedPercent": 8, "windowDurationMins": 300, "resetsAt": 1777762101},
-                            "secondary": {"usedPercent": 60, "windowDurationMins": 10080, "resetsAt": 1777986630},
+                            "primary": {"usedPercent": 60, "windowDurationMins": 10080, "resetsAt": 1777986630},
+                            "secondary": None,
                             "credits": {"hasCredits": False, "unlimited": False, "balance": "0"},
                             "planType": "pro",
                             "rateLimitReachedType": None

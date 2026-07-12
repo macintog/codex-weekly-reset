@@ -70,7 +70,11 @@ struct RateLimitSnapshot: Codable, Equatable, Sendable {
       throw RateLimitSelectionError.missingMainCodexBucket
     }
 
-    guard let weekly = bucket.secondary else {
+    let weekly = [bucket.primary, bucket.secondary]
+      .compactMap { $0 }
+      .first { $0.windowDurationMins == 10_080 }
+
+    guard let weekly else {
       throw RateLimitSelectionError.missingWeeklyWindow
     }
 
