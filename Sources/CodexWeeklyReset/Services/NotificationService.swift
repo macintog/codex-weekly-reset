@@ -5,13 +5,19 @@ protocol UserNotificationManaging {
   func authorizationStatus() async -> NotificationPermissionState
   func requestAuthorization() async -> NotificationPermissionState
   func notify(_ event: LimitNotificationEvent, previous: RateLimitSnapshot, current: RateLimitSnapshot) async throws
+  func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws
 }
 
 final class SystemNotificationService: NSObject, UserNotificationManaging {
   private let center: UNUserNotificationCenter
+  private let defaults: UserDefaults
 
-  init(center: UNUserNotificationCenter = .current()) {
+  init(
+    center: UNUserNotificationCenter = .current(),
+    defaults: UserDefaults = .standard
+  ) {
     self.center = center
+    self.defaults = defaults
     super.init()
     center.delegate = self
   }
@@ -45,6 +51,27 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
     try await center.add(request)
   }
 
+  func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {
+    let defaultsKey = "delivered-notification.\(alert.notificationIdentifier)"
+    guard !defaults.bool(forKey: defaultsKey) else {
+      return
+    }
+
+    let content = UNMutableNotificationContent()
+    content.title = alert.title
+    content.body = alert.body(availableCount: availableCount)
+    content.sound = .default
+
+    let request = UNNotificationRequest(
+      identifier: alert.notificationIdentifier,
+      content: content,
+      trigger: nil
+    )
+
+    try await center.add(request)
+    defaults.set(true, forKey: defaultsKey)
+  }
+
   private func notificationSettings() async -> UNNotificationSettings {
     await withCheckedContinuation { continuation in
       center.getNotificationSettings { settings in
@@ -75,6 +102,8 @@ struct FixedNotificationService: UserNotificationManaging {
   }
 
   func notify(_ event: LimitNotificationEvent, previous: RateLimitSnapshot, current: RateLimitSnapshot) async throws {}
+
+  func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {}
 }
 
 private extension NotificationPermissionState {

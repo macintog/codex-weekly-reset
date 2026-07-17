@@ -4,7 +4,7 @@ import XCTest
 final class RateLimitTests: XCTestCase {
   func testParsesMainCodexWeeklyBucket() throws {
     let envelope = try decodeEnvelope("""
-    {"rateLimitsByLimitId":{"codex":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":300,"resetsAt":1777744100},"secondary":{"usedPercent":52,"windowDurationMins":10080,"resetsAt":1777986630},"planType":"pro","rateLimitReachedType":null}}}
+    {"rateLimitsByLimitId":{"codex":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":300,"resetsAt":1777744100},"secondary":{"usedPercent":52,"windowDurationMins":10080,"resetsAt":1777986630},"planType":"pro","rateLimitReachedType":null}},"rateLimitResetCredits":{"availableCount":2,"credits":[{"id":"RateLimitResetCredit_1","resetType":"codexRateLimits","status":"available","grantedAt":1781654400,"expiresAt":1784246400},{"id":"RateLimitResetCredit_2","resetType":"codexRateLimits","status":"redeemed","grantedAt":1781654401,"expiresAt":1781654402}]}}
     """)
 
     let checkedAt = Date(timeIntervalSince1970: 1_700_000_000)
@@ -20,23 +20,141 @@ final class RateLimitTests: XCTestCase {
     XCTAssertEqual(snapshot.windowDurationMins, 10080)
     XCTAssertEqual(snapshot.planType, "pro")
     XCTAssertEqual(snapshot.checkedAt, checkedAt)
+    XCTAssertEqual(snapshot.resetCredits?.availableCount, 2)
+    XCTAssertEqual(snapshot.resetCredits?.earliestAvailableExpiry, Date(timeIntervalSince1970: 1784246400))
   }
 
-  func testParsesMainCodexWeeklyBucketWhenWeeklyWindowIsPrimary() throws {
+  func testParsesCurrentLiveShapeWithWeeklyWindowInPrimary() throws {
     let envelope = try decodeEnvelope("""
-    {"rateLimits":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":10080,"resetsAt":1784487538},"secondary":null,"credits":{"hasCredits":false,"unlimited":false,"balance":"0"},"individualLimit":null,"planType":"pro","rateLimitReachedType":null},"rateLimitsByLimitId":{"codex":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":10080,"resetsAt":1784487538},"secondary":null,"credits":{"hasCredits":false,"unlimited":false,"balance":"0"},"individualLimit":null,"planType":"pro","rateLimitReachedType":null}}}
+    {"rateLimits":{"limitId":"codex","primary":{"usedPercent":36,"windowDurationMins":10080,"resetsAt":1784811085},"secondary":null},"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":36,"windowDurationMins":10080,"resetsAt":1784811085},"secondary":null}},"rateLimitResetCredits":{"availableCount":5,"credits":[{"status":"available","grantedAt":1781743116,"expiresAt":1784335116},{"status":"available","grantedAt":1782518078,"expiresAt":1785110078}]}}
     """)
 
     let snapshot = try RateLimitSnapshot.mainCodexWeekly(
       from: envelope,
-      sourcePath: "/Applications/Codex.app/Contents/Resources/codex"
+      sourcePath: "/Users/test/.local/bin/codex"
     )
 
-    XCTAssertEqual(snapshot.limitId, "codex")
-    XCTAssertEqual(snapshot.remainingPercent, 97, accuracy: 0.001)
-    XCTAssertEqual(snapshot.usedPercent, 3, accuracy: 0.001)
+    XCTAssertEqual(snapshot.remainingPercent, 64, accuracy: 0.001)
     XCTAssertEqual(snapshot.windowDurationMins, 10080)
-    XCTAssertEqual(snapshot.planType, "pro")
+    XCTAssertEqual(snapshot.resetsAt, Date(timeIntervalSince1970: 1784811085))
+    XCTAssertEqual(snapshot.resetCredits?.availableCount, 5)
+    XCTAssertEqual(snapshot.resetCredits?.earliestAvailableExpiry, Date(timeIntervalSince1970: 1784335116))
+  }
+
+  func testResetCreditsUseAuthoritativeCountAndEarliestAvailableExpiry() throws {
+    let credits = try JSONDecoder().decode(
+      RateLimitResetCredits.self,
+      from: Data("""
+      {"availableCount":4,"credits":[{"status":"available","grantedAt":100,"expiresAt":400},{"status":"redeemed","grantedAt":50,"expiresAt":200},{"status":"available","grantedAt":150,"expiresAt":300}]}
+      """.utf8)
+    )
+
+    XCTAssertEqual(credits.availableCount, 4)
+    XCTAssertEqual(credits.earliestAvailableExpiry, Date(timeIntervalSince1970: 300))
+  }
+
+  func testResetCreditsWithoutDetailRowsHaveNoExpiry() throws {
+    let credits = try JSONDecoder().decode(
+      RateLimitResetCredits.self,
+      from: Data("{\"availableCount\":2,\"credits\":null}".utf8)
+    )
+
+    XCTAssertEqual(credits.availableCount, 2)
+    XCTAssertNil(credits.earliestAvailableExpiry)
+  }
+
+  func testResetCreditPresentationUsesPluralizationAndEarliestExpiry() {
+    let one = ResetCreditPresentation(resetCredits: RateLimitResetCredits(
+      availableCount: 1,
+      credits: [RateLimitResetCredit(
+        id: nil,
+        resetType: nil,
+        status: "available",
+        grantedAt: 100,
+        expiresAt: 400,
+        title: nil,
+        description: nil
+      )]
+    ))
+    let many = ResetCreditPresentation(resetCredits: RateLimitResetCredits(availableCount: 2))
+
+    XCTAssertEqual(one.countText, "1 banked reset available")
+    XCTAssertTrue(one.expiryText?.contains("Next reset expires") == true)
+    XCTAssertEqual(many.countText, "2 banked resets available")
+    XCTAssertNil(many.expiryText)
+  }
+
+  func testResetExpiryPolicyUsesOneDayWarningAndOneHourCriticalAlert() {
+    let now = Date(timeIntervalSince1970: 10_000)
+
+    XCTAssertNil(ResetCreditExpiryPolicy.alert(
+      resetCredits: resetCredits(expiry: now.addingTimeInterval(86_401)),
+      now: now
+    ))
+    XCTAssertEqual(
+      ResetCreditExpiryPolicy.alert(
+        resetCredits: resetCredits(expiry: now.addingTimeInterval(86_400)),
+        now: now
+      )?.level,
+      .warning
+    )
+    XCTAssertEqual(
+      ResetCreditExpiryPolicy.alert(
+        resetCredits: resetCredits(expiry: now.addingTimeInterval(3_601)),
+        now: now
+      )?.level,
+      .warning
+    )
+    XCTAssertEqual(
+      ResetCreditExpiryPolicy.alert(
+        resetCredits: resetCredits(expiry: now.addingTimeInterval(3_600)),
+        now: now
+      )?.level,
+      .critical
+    )
+    XCTAssertNil(ResetCreditExpiryPolicy.alert(
+      resetCredits: resetCredits(expiry: now),
+      now: now
+    ))
+  }
+
+  func testResetExpiryAlertsAreDeduplicatedPerExpiryAndThreshold() {
+    let expiry = Date(timeIntervalSince1970: 20_000)
+    let warning = ResetCreditExpiryAlert(level: .warning, expiry: expiry)
+    let critical = ResetCreditExpiryAlert(level: .critical, expiry: expiry)
+    var handled: Set<ResetCreditExpiryAlert> = []
+
+    XCTAssertTrue(handled.insert(warning).inserted)
+    XCTAssertFalse(handled.insert(warning).inserted)
+    XCTAssertTrue(handled.insert(critical).inserted)
+    XCTAssertNotEqual(warning.notificationIdentifier, critical.notificationIdentifier)
+  }
+
+  func testResetExpiryNotificationCopyIsActionable() {
+    let expiry = Date(timeIntervalSince1970: 20_000)
+    let warning = ResetCreditExpiryAlert(level: .warning, expiry: expiry)
+    let critical = ResetCreditExpiryAlert(level: .critical, expiry: expiry)
+
+    XCTAssertEqual(warning.title, "Banked Codex reset expires within a day")
+    XCTAssertTrue(warning.body(availableCount: 5).contains("5 banked resets"))
+    XCTAssertEqual(critical.title, "Banked Codex reset expires within an hour")
+    XCTAssertTrue(critical.body(availableCount: 5).contains("avoid losing it"))
+  }
+
+  func testResetCreditPresentationExposesVisualAlertLevel() {
+    let now = Date(timeIntervalSince1970: 10_000)
+
+    let warning = ResetCreditPresentation(
+      resetCredits: resetCredits(expiry: now.addingTimeInterval(4_000)),
+      now: now
+    )
+    let critical = ResetCreditPresentation(
+      resetCredits: resetCredits(expiry: now.addingTimeInterval(1_800)),
+      now: now
+    )
+
+    XCTAssertEqual(warning.expiryAlert?.level, .warning)
+    XCTAssertEqual(critical.expiryAlert?.level, .critical)
   }
 
   func testPrefersMainCodexOverModelSpecificBucket() throws {
@@ -205,12 +323,16 @@ final class RateLimitTests: XCTestCase {
                         "codex": {
                             "limitId": "codex",
                             "limitName": None,
-                            "primary": {"usedPercent": 60, "windowDurationMins": 10080, "resetsAt": 1777986630},
-                            "secondary": None,
+                            "primary": {"usedPercent": 8, "windowDurationMins": 300, "resetsAt": 1777762101},
+                            "secondary": {"usedPercent": 60, "windowDurationMins": 10080, "resetsAt": 1777986630},
                             "credits": {"hasCredits": False, "unlimited": False, "balance": "0"},
                             "planType": "pro",
                             "rateLimitReachedType": None
                         }
+                    },
+                    "rateLimitResetCredits": {
+                        "availableCount": 3,
+                        "credits": [{"status": "available", "grantedAt": 1781654400, "expiresAt": 1784246400}]
                     }
                 }
             }), flush=True)
@@ -226,6 +348,8 @@ final class RateLimitTests: XCTestCase {
 
     XCTAssertEqual(snapshot.remainingPercent, 40, accuracy: 0.001)
     XCTAssertEqual(snapshot.sourcePath, executable.path)
+    XCTAssertEqual(envelope.rateLimitResetCredits?.availableCount, 3)
+    XCTAssertEqual(envelope.rateLimitResetCredits?.credits?.first?.expiryDate, Date(timeIntervalSince1970: 1784246400))
   }
 
   func testAppServerClientTimesOutWhenServerDoesNotAnswer() async throws {
@@ -339,7 +463,26 @@ final class RateLimitTests: XCTestCase {
       resetsAt: resetsAt,
       checkedAt: checkedAt,
       planType: "pro",
-      sourcePath: "/codex"
+      sourcePath: "/codex",
+      resetCredits: nil
+    )
+  }
+
+  private func resetCredits(
+    availableCount: Int = 5,
+    expiry: Date
+  ) -> RateLimitResetCredits {
+    RateLimitResetCredits(
+      availableCount: availableCount,
+      credits: [RateLimitResetCredit(
+        id: "RateLimitResetCredit_test",
+        resetType: "codexRateLimits",
+        status: "available",
+        grantedAt: expiry.addingTimeInterval(-86_400).timeIntervalSince1970,
+        expiresAt: expiry.timeIntervalSince1970,
+        title: nil,
+        description: nil
+      )]
     )
   }
 }

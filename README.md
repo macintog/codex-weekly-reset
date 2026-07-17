@@ -12,6 +12,13 @@ Under the hood it asks Codex for the live weekly limit instead of guessing from 
 
 This is an independent utility. It is not affiliated with, endorsed by, or supported by OpenAI.
 
+## What’s New in 0.1.2
+
+- **Banked resets at a glance.** See how many banked resets you have and when the next one expires, right alongside your regularly scheduled weekly reset.
+- **Warnings before a reset expires.** The expiry row turns amber within 24 hours and red within one hour. If notifications are enabled, you’ll also get a system notification at each threshold.
+- **A clearer, more compact popover.** Usage and reset information is easier to scan, while source, notification, and build details stay available without competing for attention.
+- **Reliable reporting with current Codex releases.** Weekly capacity and reset timing continue to load correctly after recent Codex changes.
+
 ## Run
 
 ```bash

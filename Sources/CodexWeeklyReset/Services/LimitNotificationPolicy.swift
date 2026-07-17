@@ -99,3 +99,67 @@ enum LimitNotificationEvent: String, Equatable, Sendable {
     return parts.joined(separator: " ")
   }
 }
+
+struct ResetCreditExpiryAlert: Equatable, Hashable, Sendable {
+  enum Level: String, Equatable, Hashable, Sendable {
+    case warning
+    case critical
+  }
+
+  let level: Level
+  let expiry: Date
+
+  var notificationIdentifier: String {
+    "codex-weekly-reset-reset-expiry-\(level.rawValue)-\(Int(expiry.timeIntervalSince1970))"
+  }
+
+  var title: String {
+    switch level {
+    case .warning:
+      return "Banked Codex reset expires within a day"
+    case .critical:
+      return "Banked Codex reset expires within an hour"
+    }
+  }
+
+  func body(availableCount: Int) -> String {
+    let expiryText = DisplayFormatters.resetDayAndTime.string(from: expiry)
+
+    switch level {
+    case .warning:
+      let noun = availableCount == 1 ? "reset" : "resets"
+      return "One of your \(availableCount) banked \(noun) expires \(expiryText)."
+    case .critical:
+      return "Use the reset before \(expiryText) to avoid losing it."
+    }
+  }
+}
+
+enum ResetCreditExpiryPolicy {
+  static let warningInterval: TimeInterval = 24 * 60 * 60
+  static let criticalInterval: TimeInterval = 60 * 60
+
+  static func alert(
+    resetCredits: RateLimitResetCredits?,
+    now: Date
+  ) -> ResetCreditExpiryAlert? {
+    guard let expiry = resetCredits?.earliestAvailableExpiry else {
+      return nil
+    }
+
+    let remaining = expiry.timeIntervalSince(now)
+    guard remaining > 0 else {
+      return nil
+    }
+
+    if remaining <= criticalInterval {
+      return ResetCreditExpiryAlert(level: .critical, expiry: expiry)
+    }
+
+    if remaining <= warningInterval {
+      return ResetCreditExpiryAlert(level: .warning, expiry: expiry)
+    }
+
+    return nil
+  }
+}
