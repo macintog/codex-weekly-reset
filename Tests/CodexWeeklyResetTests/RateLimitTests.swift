@@ -128,6 +128,48 @@ final class RateLimitTests: XCTestCase {
     XCTAssertFalse(handled.insert(warning).inserted)
     XCTAssertTrue(handled.insert(critical).inserted)
     XCTAssertNotEqual(warning.notificationIdentifier, critical.notificationIdentifier)
+    XCTAssertTrue(SystemNotificationService.resetExpiryDefaultsKey(for: warning).hasPrefix("delivered-notification.v2."))
+  }
+
+  func testNotificationPermissionStatesAllowOnlyDeliverableStatuses() {
+    XCTAssertFalse(NotificationPermissionState.notDetermined.allowsDelivery)
+    XCTAssertFalse(NotificationPermissionState.denied.allowsDelivery)
+    XCTAssertTrue(NotificationPermissionState.authorized.allowsDelivery)
+    XCTAssertTrue(NotificationPermissionState.provisional.allowsDelivery)
+    XCTAssertFalse(NotificationPermissionState.unknown.allowsDelivery)
+  }
+
+  @MainActor
+  func testStartupWaitsForNotificationAuthorizationBeforeExpiryAlert() async throws {
+    let notifier = DelayedNotificationService()
+    let fixture = try temporaryRateLimitFixture(
+      expiresAt: Date().addingTimeInterval(30 * 60)
+    )
+    let monitor = LimitMonitor(
+      configuration: AppConfiguration(
+        configuredCodexPath: nil,
+        fixturePath: fixture.path,
+        notificationOverride: nil,
+        pollInterval: 3_600,
+        disableCodexFallbacks: true
+      ),
+      resolver: CodexExecutableResolver(includeFallbacks: false),
+      notifier: notifier
+    )
+
+    monitor.start()
+    try await waitForNotificationEvent(.authorizationStarted, in: notifier)
+    try await Task.sleep(nanoseconds: 150_000_000)
+    let alertedBeforeAuthorization = await notifier.hasEvent(.resetExpiryAlert)
+    XCTAssertFalse(alertedBeforeAuthorization)
+
+    await notifier.releaseAuthorization()
+    try await waitForNotificationEvent(.resetExpiryAlert, in: notifier)
+
+    let events = await notifier.recordedEvents()
+    let authorizedIndex = try XCTUnwrap(events.firstIndex(of: .authorizationCompleted))
+    let alertIndex = try XCTUnwrap(events.firstIndex(of: .resetExpiryAlert))
+    XCTAssertLessThan(authorizedIndex, alertIndex)
   }
 
   func testResetExpiryNotificationCopyIsActionable() {
@@ -449,6 +491,37 @@ final class RateLimitTests: XCTestCase {
     return executable
   }
 
+  private func temporaryRateLimitFixture(expiresAt: Date) throws -> URL {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: directory,
+      withIntermediateDirectories: true
+    )
+
+    let fixture = directory.appendingPathComponent("rate-limits.json")
+    let resetsAt = Int(Date().addingTimeInterval(4 * 24 * 60 * 60).timeIntervalSince1970)
+    let expiry = Int(expiresAt.timeIntervalSince1970)
+    let json = """
+    {"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":39,"windowDurationMins":10080,"resetsAt":\(resetsAt)},"secondary":null}},"rateLimitResetCredits":{"availableCount":1,"credits":[{"status":"available","grantedAt":\(expiry - 86_400),"expiresAt":\(expiry)}]}}
+    """
+    try json.write(to: fixture, atomically: true, encoding: .utf8)
+    return fixture
+  }
+
+  private func waitForNotificationEvent(
+    _ event: DelayedNotificationService.Event,
+    in notifier: DelayedNotificationService
+  ) async throws {
+    for _ in 0..<100 {
+      if await notifier.hasEvent(event) {
+        return
+      }
+      try await Task.sleep(nanoseconds: 10_000_000)
+    }
+    XCTFail("Timed out waiting for \(event)")
+  }
+
   private func snapshot(
     remaining: Double,
     checkedAt: Date = Date(timeIntervalSince1970: 1_000),
@@ -484,5 +557,56 @@ final class RateLimitTests: XCTestCase {
         description: nil
       )]
     )
+  }
+}
+
+private actor DelayedNotificationService: UserNotificationManaging {
+  enum Event: Equatable {
+    case authorizationStarted
+    case authorizationCompleted
+    case resetExpiryAlert
+  }
+
+  private var events: [Event] = []
+  private var authorizationReleased = false
+  private var authorizationContinuation: CheckedContinuation<Void, Never>?
+
+  func authorizationStatus() async -> NotificationPermissionState {
+    events.append(.authorizationStarted)
+    if !authorizationReleased {
+      await withCheckedContinuation { continuation in
+        authorizationContinuation = continuation
+      }
+    }
+    events.append(.authorizationCompleted)
+    return .authorized
+  }
+
+  func requestAuthorization() async -> NotificationPermissionState {
+    .authorized
+  }
+
+  func notify(
+    _ event: LimitNotificationEvent,
+    previous: RateLimitSnapshot,
+    current: RateLimitSnapshot
+  ) async throws {}
+
+  func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {
+    events.append(.resetExpiryAlert)
+  }
+
+  func releaseAuthorization() {
+    authorizationReleased = true
+    authorizationContinuation?.resume()
+    authorizationContinuation = nil
+  }
+
+  func hasEvent(_ event: Event) -> Bool {
+    events.contains(event)
+  }
+
+  func recordedEvents() -> [Event] {
+    events
   }
 }

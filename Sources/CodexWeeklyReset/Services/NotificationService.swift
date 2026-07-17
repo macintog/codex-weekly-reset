@@ -9,6 +9,8 @@ protocol UserNotificationManaging {
 }
 
 final class SystemNotificationService: NSObject, UserNotificationManaging {
+  static let resetExpiryDeliveryNamespace = "delivered-notification.v2."
+
   private let center: UNUserNotificationCenter
   private let defaults: UserDefaults
 
@@ -37,6 +39,8 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
   }
 
   func notify(_ event: LimitNotificationEvent, previous: RateLimitSnapshot, current: RateLimitSnapshot) async throws {
+    try await requireAuthorization()
+
     let content = UNMutableNotificationContent()
     content.title = event.title
     content.body = event.body(previous: previous, current: current)
@@ -52,7 +56,9 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
   }
 
   func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {
-    let defaultsKey = "delivered-notification.\(alert.notificationIdentifier)"
+    try await requireAuthorization()
+
+    let defaultsKey = Self.resetExpiryDefaultsKey(for: alert)
     guard !defaults.bool(forKey: defaultsKey) else {
       return
     }
@@ -72,6 +78,16 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
     defaults.set(true, forKey: defaultsKey)
   }
 
+  static func resetExpiryDefaultsKey(for alert: ResetCreditExpiryAlert) -> String {
+    resetExpiryDeliveryNamespace + alert.notificationIdentifier
+  }
+
+  private func requireAuthorization() async throws {
+    guard await authorizationStatus().allowsDelivery else {
+      throw NotificationDeliveryError.notAuthorized
+    }
+  }
+
   private func notificationSettings() async -> UNNotificationSettings {
     await withCheckedContinuation { continuation in
       center.getNotificationSettings { settings in
@@ -79,6 +95,10 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
       }
     }
   }
+}
+
+private enum NotificationDeliveryError: Error {
+  case notAuthorized
 }
 
 extension SystemNotificationService: UNUserNotificationCenterDelegate {

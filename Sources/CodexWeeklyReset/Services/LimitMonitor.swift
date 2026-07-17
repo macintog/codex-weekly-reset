@@ -63,13 +63,9 @@ final class LimitMonitor: ObservableObject {
 
     Task {
       await updateNotificationAuthorization()
-    }
-
-    Task {
       await refresh(trigger: .startup)
       startPolling()
     }
-
   }
 
   func refreshNow() {

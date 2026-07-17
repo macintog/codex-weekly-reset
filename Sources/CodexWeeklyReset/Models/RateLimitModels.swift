@@ -206,6 +206,10 @@ enum NotificationPermissionState: String, Codable, Equatable, Sendable {
       return "Unknown"
     }
   }
+
+  var allowsDelivery: Bool {
+    self == .authorized || self == .provisional
+  }
 }
 
 enum MonitorState: Equatable {

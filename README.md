@@ -1,23 +1,29 @@
 # Codex Weekly Reset
 
-A tiny macOS menu bar app for answering two important questions: how much weekly Codex rate-limit capacity do you have left, and when did Tibo reset it?
+A native macOS menu bar app for seeing how much weekly Codex capacity remains, when the regular reset happens, and whether a banked reset is about to expire.
 
 ![Codex Weekly Reset website showing the app preview and download button](website/assets/codex-weekly-reset-website.png)
 
-It sits up top with a little ring and a percentage, so you can glance at your remaining weekly Codex capacity without opening the app, running a command, or doing the sad mental math yourself. It’s not trying to be a control center. It’s more like a kitchen timer for your AI budget.
+It stays in the menu bar with a small status ring and your remaining weekly percentage. Open the popover for the regular reset time, available banked resets, and the next banked-reset expiry.
 
-The reset notifications are the real magic trick: leave it running, and it can nudge you when capacity comes back instead of making you check manually like a person living in a spreadsheet. It also warns you when you’re getting low, when you’re nearly out, and when the tank hits empty.
+Notifications cover the moments worth interrupting you for: low capacity, an exhausted limit, restored capacity, and a banked reset that will expire in one day or one hour.
 
-Under the hood it asks Codex for the live weekly limit instead of guessing from logs or old snapshots. If that read fails, it says so. No pretend numbers, no spooky cache confidence.
+The app reads the live Codex app-server response instead of inferring limits from logs or old snapshots. If that read fails, it says so instead of showing a stale number.
 
 This is an independent utility. It is not affiliated with, endorsed by, or supported by OpenAI.
 
+## Download
+
+[**Download Codex Weekly Reset 0.1.2 (build 109)**](https://github.com/macintog/codex-weekly-reset/releases/download/v0.1.2/CodexWeeklyReset.zip)
+
+Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.2 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.2).
+
 ## What’s New in 0.1.2
 
-- **Banked resets at a glance.** See how many banked resets you have and when the next one expires, right alongside your regularly scheduled weekly reset.
-- **Warnings before a reset expires.** The expiry row turns amber within 24 hours and red within one hour. If notifications are enabled, you’ll also get a system notification at each threshold.
-- **A clearer, more compact popover.** Usage and reset information is easier to scan, while source, notification, and build details stay available without competing for attention.
-- **Reliable reporting with current Codex releases.** Weekly capacity and reset timing continue to load correctly after recent Codex changes.
+- **Banked resets at a glance.** See the available count and next expiry beside the regularly scheduled weekly reset.
+- **Warnings before a reset expires.** The expiry row turns amber within 24 hours and red within one hour, with a macOS notification at each threshold.
+- **A clearer popover.** Quota and reset information lead the hierarchy; source, notification, and build details remain available without competing for attention.
+- **Reliable reporting with current Codex releases.** Weekly capacity and reset timing load from the current live response format.
 
 ## Run
 
