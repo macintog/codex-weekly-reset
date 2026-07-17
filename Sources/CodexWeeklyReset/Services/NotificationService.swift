@@ -1,17 +1,25 @@
 import Foundation
+import OSLog
 import UserNotifications
 
 protocol UserNotificationManaging {
   func authorizationStatus() async -> NotificationPermissionState
   func requestAuthorization() async -> NotificationPermissionState
   func notify(_ event: LimitNotificationEvent, previous: RateLimitSnapshot, current: RateLimitSnapshot) async throws
+  func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws
 }
 
 final class SystemNotificationService: NSObject, UserNotificationManaging {
   private let center: UNUserNotificationCenter
+  private let launchIdentifier: String
+  private let logger = Logger(subsystem: "com.macintog.codexweeklyreset", category: "Notifications")
 
-  init(center: UNUserNotificationCenter = .current()) {
+  init(
+    center: UNUserNotificationCenter = .current(),
+    launchIdentifier: String = UUID().uuidString
+  ) {
     self.center = center
+    self.launchIdentifier = launchIdentifier
     super.init()
     center.delegate = self
   }
@@ -31,6 +39,8 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
   }
 
   func notify(_ event: LimitNotificationEvent, previous: RateLimitSnapshot, current: RateLimitSnapshot) async throws {
+    try await requireAuthorization()
+
     let content = UNMutableNotificationContent()
     content.title = event.title
     content.body = event.body(previous: previous, current: current)
@@ -45,6 +55,39 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
     try await center.add(request)
   }
 
+  func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {
+    try await requireAuthorization()
+
+    let content = UNMutableNotificationContent()
+    content.body = alert.body(availableCount: availableCount)
+    content.sound = .default
+
+    let request = UNNotificationRequest(
+      identifier: Self.resetExpiryRequestIdentifier(
+        for: alert,
+        launchIdentifier: launchIdentifier
+      ),
+      content: content,
+      trigger: nil
+    )
+
+    try await center.add(request)
+    logger.info("Submitted reset-expiry alert \(alert.level.rawValue, privacy: .public) for this launch")
+  }
+
+  static func resetExpiryRequestIdentifier(
+    for alert: ResetCreditExpiryAlert,
+    launchIdentifier: String
+  ) -> String {
+    "\(alert.notificationIdentifier)-launch-\(launchIdentifier)"
+  }
+
+  private func requireAuthorization() async throws {
+    guard await authorizationStatus().allowsDelivery else {
+      throw NotificationDeliveryError.notAuthorized
+    }
+  }
+
   private func notificationSettings() async -> UNNotificationSettings {
     await withCheckedContinuation { continuation in
       center.getNotificationSettings { settings in
@@ -52,6 +95,10 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
       }
     }
   }
+}
+
+private enum NotificationDeliveryError: Error {
+  case notAuthorized
 }
 
 extension SystemNotificationService: UNUserNotificationCenterDelegate {
@@ -75,6 +122,8 @@ struct FixedNotificationService: UserNotificationManaging {
   }
 
   func notify(_ event: LimitNotificationEvent, previous: RateLimitSnapshot, current: RateLimitSnapshot) async throws {}
+
+  func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {}
 }
 
 private extension NotificationPermissionState {

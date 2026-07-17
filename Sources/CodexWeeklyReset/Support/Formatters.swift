@@ -21,6 +21,28 @@ enum DisplayFormatters {
     return formatter
   }()
 
+  static let resetTime: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "h:mm a"
+    return formatter
+  }()
+
+  static func alertResetDayAndTime(_ date: Date, now: Date = Date()) -> String {
+    let calendar = Calendar.current
+    let day: String
+
+    if calendar.isDate(date, inSameDayAs: now) {
+      day = "today"
+    } else if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
+              calendar.isDate(date, inSameDayAs: tomorrow) {
+      day = "tomorrow"
+    } else {
+      return resetDayAndTime.string(from: date)
+    }
+
+    return "\(day) at \(resetTime.string(from: date))"
+  }
+
   static func percentage(_ value: Double) -> String {
     "\(Int(value.rounded()))%"
   }

@@ -4,7 +4,7 @@ import XCTest
 final class RateLimitTests: XCTestCase {
   func testParsesMainCodexWeeklyBucket() throws {
     let envelope = try decodeEnvelope("""
-    {"rateLimitsByLimitId":{"codex":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":300,"resetsAt":1777744100},"secondary":{"usedPercent":52,"windowDurationMins":10080,"resetsAt":1777986630},"planType":"pro","rateLimitReachedType":null}}}
+    {"rateLimitsByLimitId":{"codex":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":300,"resetsAt":1777744100},"secondary":{"usedPercent":52,"windowDurationMins":10080,"resetsAt":1777986630},"planType":"pro","rateLimitReachedType":null}},"rateLimitResetCredits":{"availableCount":2,"credits":[{"id":"RateLimitResetCredit_1","resetType":"codexRateLimits","status":"available","grantedAt":1781654400,"expiresAt":1784246400},{"id":"RateLimitResetCredit_2","resetType":"codexRateLimits","status":"redeemed","grantedAt":1781654401,"expiresAt":1781654402}]}}
     """)
 
     let checkedAt = Date(timeIntervalSince1970: 1_700_000_000)
@@ -20,23 +20,250 @@ final class RateLimitTests: XCTestCase {
     XCTAssertEqual(snapshot.windowDurationMins, 10080)
     XCTAssertEqual(snapshot.planType, "pro")
     XCTAssertEqual(snapshot.checkedAt, checkedAt)
+    XCTAssertEqual(snapshot.resetCredits?.availableCount, 2)
+    XCTAssertEqual(snapshot.resetCredits?.earliestAvailableExpiry, Date(timeIntervalSince1970: 1784246400))
   }
 
-  func testParsesMainCodexWeeklyBucketWhenWeeklyWindowIsPrimary() throws {
+  func testParsesCurrentLiveShapeWithWeeklyWindowInPrimary() throws {
     let envelope = try decodeEnvelope("""
-    {"rateLimits":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":10080,"resetsAt":1784487538},"secondary":null,"credits":{"hasCredits":false,"unlimited":false,"balance":"0"},"individualLimit":null,"planType":"pro","rateLimitReachedType":null},"rateLimitsByLimitId":{"codex":{"limitId":"codex","limitName":null,"primary":{"usedPercent":3,"windowDurationMins":10080,"resetsAt":1784487538},"secondary":null,"credits":{"hasCredits":false,"unlimited":false,"balance":"0"},"individualLimit":null,"planType":"pro","rateLimitReachedType":null}}}
+    {"rateLimits":{"limitId":"codex","primary":{"usedPercent":36,"windowDurationMins":10080,"resetsAt":1784811085},"secondary":null},"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":36,"windowDurationMins":10080,"resetsAt":1784811085},"secondary":null}},"rateLimitResetCredits":{"availableCount":5,"credits":[{"status":"available","grantedAt":1781743116,"expiresAt":1784335116},{"status":"available","grantedAt":1782518078,"expiresAt":1785110078}]}}
     """)
 
     let snapshot = try RateLimitSnapshot.mainCodexWeekly(
       from: envelope,
-      sourcePath: "/Applications/Codex.app/Contents/Resources/codex"
+      sourcePath: "/Users/test/.local/bin/codex"
     )
 
-    XCTAssertEqual(snapshot.limitId, "codex")
-    XCTAssertEqual(snapshot.remainingPercent, 97, accuracy: 0.001)
-    XCTAssertEqual(snapshot.usedPercent, 3, accuracy: 0.001)
+    XCTAssertEqual(snapshot.remainingPercent, 64, accuracy: 0.001)
     XCTAssertEqual(snapshot.windowDurationMins, 10080)
-    XCTAssertEqual(snapshot.planType, "pro")
+    XCTAssertEqual(snapshot.resetsAt, Date(timeIntervalSince1970: 1784811085))
+    XCTAssertEqual(snapshot.resetCredits?.availableCount, 5)
+    XCTAssertEqual(snapshot.resetCredits?.earliestAvailableExpiry, Date(timeIntervalSince1970: 1784335116))
+  }
+
+  func testResetCreditsUseAuthoritativeCountAndEarliestAvailableExpiry() throws {
+    let credits = try JSONDecoder().decode(
+      RateLimitResetCredits.self,
+      from: Data("""
+      {"availableCount":4,"credits":[{"status":"available","grantedAt":100,"expiresAt":400},{"status":"redeemed","grantedAt":50,"expiresAt":200},{"status":"available","grantedAt":150,"expiresAt":300}]}
+      """.utf8)
+    )
+
+    XCTAssertEqual(credits.availableCount, 4)
+    XCTAssertEqual(credits.earliestAvailableExpiry, Date(timeIntervalSince1970: 300))
+  }
+
+  func testResetCreditsWithoutDetailRowsHaveNoExpiry() throws {
+    let credits = try JSONDecoder().decode(
+      RateLimitResetCredits.self,
+      from: Data("{\"availableCount\":2,\"credits\":null}".utf8)
+    )
+
+    XCTAssertEqual(credits.availableCount, 2)
+    XCTAssertNil(credits.earliestAvailableExpiry)
+  }
+
+  func testResetCreditPresentationUsesPluralizationAndEarliestExpiry() {
+    let one = ResetCreditPresentation(resetCredits: RateLimitResetCredits(
+      availableCount: 1,
+      credits: [RateLimitResetCredit(
+        id: nil,
+        resetType: nil,
+        status: "available",
+        grantedAt: 100,
+        expiresAt: 400,
+        title: nil,
+        description: nil
+      )]
+    ))
+    let many = ResetCreditPresentation(resetCredits: RateLimitResetCredits(availableCount: 2))
+
+    XCTAssertEqual(one.countText, "1 banked reset available")
+    XCTAssertTrue(one.expiryText?.contains("Next reset expires") == true)
+    XCTAssertEqual(many.countText, "2 banked resets available")
+    XCTAssertNil(many.expiryText)
+  }
+
+  func testResetExpiryPolicyUsesOneDayWarningAndOneHourCriticalAlert() {
+    let now = Date(timeIntervalSince1970: 10_000)
+
+    XCTAssertNil(ResetCreditExpiryPolicy.alert(
+      resetCredits: resetCredits(expiry: now.addingTimeInterval(86_401)),
+      now: now
+    ))
+    XCTAssertEqual(
+      ResetCreditExpiryPolicy.alert(
+        resetCredits: resetCredits(expiry: now.addingTimeInterval(86_400)),
+        now: now
+      )?.level,
+      .warning
+    )
+    XCTAssertEqual(
+      ResetCreditExpiryPolicy.alert(
+        resetCredits: resetCredits(expiry: now.addingTimeInterval(3_601)),
+        now: now
+      )?.level,
+      .warning
+    )
+    XCTAssertEqual(
+      ResetCreditExpiryPolicy.alert(
+        resetCredits: resetCredits(expiry: now.addingTimeInterval(3_600)),
+        now: now
+      )?.level,
+      .critical
+    )
+    XCTAssertNil(ResetCreditExpiryPolicy.alert(
+      resetCredits: resetCredits(expiry: now),
+      now: now
+    ))
+  }
+
+  func testResetExpiryAlertsAreDeduplicatedPerExpiryAndThreshold() {
+    let expiry = Date(timeIntervalSince1970: 20_000)
+    let warning = ResetCreditExpiryAlert(level: .warning, expiry: expiry)
+    let critical = ResetCreditExpiryAlert(level: .critical, expiry: expiry)
+    var handled: Set<ResetCreditExpiryAlert> = []
+
+    XCTAssertTrue(handled.insert(warning).inserted)
+    XCTAssertFalse(handled.insert(warning).inserted)
+    XCTAssertTrue(handled.insert(critical).inserted)
+    XCTAssertNotEqual(warning.notificationIdentifier, critical.notificationIdentifier)
+
+    let firstLaunchIdentifier = SystemNotificationService.resetExpiryRequestIdentifier(
+      for: warning,
+      launchIdentifier: "launch-one"
+    )
+    let secondLaunchIdentifier = SystemNotificationService.resetExpiryRequestIdentifier(
+      for: warning,
+      launchIdentifier: "launch-two"
+    )
+    XCTAssertNotEqual(firstLaunchIdentifier, secondLaunchIdentifier)
+    XCTAssertEqual(
+      firstLaunchIdentifier,
+      SystemNotificationService.resetExpiryRequestIdentifier(
+        for: warning,
+        launchIdentifier: "launch-one"
+      )
+    )
+  }
+
+  func testNotificationPermissionStatesAllowOnlyDeliverableStatuses() {
+    XCTAssertFalse(NotificationPermissionState.notDetermined.allowsDelivery)
+    XCTAssertFalse(NotificationPermissionState.denied.allowsDelivery)
+    XCTAssertTrue(NotificationPermissionState.authorized.allowsDelivery)
+    XCTAssertTrue(NotificationPermissionState.provisional.allowsDelivery)
+    XCTAssertFalse(NotificationPermissionState.unknown.allowsDelivery)
+  }
+
+  @MainActor
+  func testStartupWaitsForNotificationAuthorizationBeforeExpiryAlert() async throws {
+    let notifier = DelayedNotificationService()
+    let fixture = try temporaryRateLimitFixture(
+      expiresAt: Date().addingTimeInterval(30 * 60)
+    )
+    let monitor = LimitMonitor(
+      configuration: AppConfiguration(
+        configuredCodexPath: nil,
+        fixturePath: fixture.path,
+        notificationOverride: nil,
+        pollInterval: 3_600,
+        disableCodexFallbacks: true
+      ),
+      resolver: CodexExecutableResolver(includeFallbacks: false),
+      notifier: notifier
+    )
+
+    monitor.start()
+    try await waitForNotificationEvent(.authorizationStarted, in: notifier)
+    try await Task.sleep(nanoseconds: 150_000_000)
+    let alertedBeforeAuthorization = await notifier.hasEvent(.resetExpiryAlert)
+    XCTAssertFalse(alertedBeforeAuthorization)
+
+    await notifier.releaseAuthorization()
+    try await waitForNotificationEvent(.resetExpiryAlert, in: notifier)
+
+    let events = await notifier.recordedEvents()
+    let authorizedIndex = try XCTUnwrap(events.firstIndex(of: .authorizationCompleted))
+    let alertIndex = try XCTUnwrap(events.firstIndex(of: .resetExpiryAlert))
+    XCTAssertLessThan(authorizedIndex, alertIndex)
+  }
+
+  @MainActor
+  func testEligibleExpiryAlertRepeatsOnEachLaunchButNotWithinOneRun() async throws {
+    let notifier = DelayedNotificationService(authorizationReleased: true)
+    let fixture = try temporaryRateLimitFixture(
+      expiresAt: Date().addingTimeInterval(30 * 60)
+    )
+    let configuration = AppConfiguration(
+      configuredCodexPath: nil,
+      fixturePath: fixture.path,
+      notificationOverride: nil,
+      pollInterval: 3_600,
+      disableCodexFallbacks: true
+    )
+
+    let firstLaunch = LimitMonitor(
+      configuration: configuration,
+      resolver: CodexExecutableResolver(includeFallbacks: false),
+      notifier: notifier
+    )
+    firstLaunch.start()
+    try await waitForNotificationEventCount(1, in: notifier)
+
+    firstLaunch.refreshNow()
+    try await Task.sleep(nanoseconds: 150_000_000)
+    let firstRunAlertCount = await notifier.eventCount(.resetExpiryAlert)
+    XCTAssertEqual(firstRunAlertCount, 1)
+
+    let secondLaunch = LimitMonitor(
+      configuration: configuration,
+      resolver: CodexExecutableResolver(includeFallbacks: false),
+      notifier: notifier
+    )
+    secondLaunch.start()
+    try await waitForNotificationEventCount(2, in: notifier)
+  }
+
+  func testResetExpiryNotificationBodyIsActionable() {
+    let expiry = Date(timeIntervalSince1970: 20_000)
+    let warning = ResetCreditExpiryAlert(level: .warning, expiry: expiry)
+    let critical = ResetCreditExpiryAlert(level: .critical, expiry: expiry)
+
+    XCTAssertTrue(warning.body(availableCount: 5).contains("5 banked resets"))
+    XCTAssertTrue(critical.body(availableCount: 5).contains("avoid losing it"))
+  }
+
+  func testResetCreditPresentationExposesVisualAlertLevel() {
+    let calendar = Calendar.current
+    let startOfDay = calendar.startOfDay(for: Date(timeIntervalSince1970: 10_000))
+    let now = calendar.date(byAdding: .hour, value: 20, to: startOfDay)!
+    let tomorrow = calendar.date(byAdding: .hour, value: 32, to: startOfDay)!
+
+    let warning = ResetCreditPresentation(
+      resetCredits: resetCredits(expiry: tomorrow),
+      now: now
+    )
+    let critical = ResetCreditPresentation(
+      resetCredits: resetCredits(expiry: now.addingTimeInterval(1_800)),
+      now: now
+    )
+
+    XCTAssertEqual(warning.expiryAlert?.level, .warning)
+    XCTAssertTrue(warning.expiryText?.contains("tomorrow at") == true)
+    XCTAssertEqual(critical.expiryAlert?.level, .critical)
+    XCTAssertTrue(critical.expiryText?.contains("today at") == true)
+  }
+
+  func testNonAlertResetExpiryKeepsWeekday() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    let presentation = ResetCreditPresentation(
+      resetCredits: resetCredits(expiry: now.addingTimeInterval(48 * 60 * 60)),
+      now: now
+    )
+
+    XCTAssertNil(presentation.expiryAlert)
+    XCTAssertFalse(presentation.expiryText?.contains("today at") == true)
+    XCTAssertFalse(presentation.expiryText?.contains("tomorrow at") == true)
   }
 
   func testPrefersMainCodexOverModelSpecificBucket() throws {
@@ -172,6 +399,81 @@ final class RateLimitTests: XCTestCase {
     XCTAssertEqual(presentation.accessibilityValue, "47% weekly remaining")
   }
 
+  func testLimitRingCompensatesForRoundedCapLength() {
+    let geometry = LimitRingGeometry(percent: 49, size: 72, lineWidth: 8)
+    let radius = (72.0 - 8.0) / 2
+    let roundCapsFraction = 8.0 / (2 * Double.pi * radius)
+
+    XCTAssertTrue(geometry.usesRoundCaps)
+    XCTAssertEqual(geometry.trimmedFraction + roundCapsFraction, 0.49, accuracy: 0.000_001)
+  }
+
+  func testLimitRingPreservesExactProgressAcrossRange() {
+    let empty = LimitRingGeometry(percent: 0, size: 72, lineWidth: 8)
+    let small = LimitRingGeometry(percent: 2, size: 72, lineWidth: 8)
+    let half = LimitRingGeometry(percent: 50, size: 72, lineWidth: 8)
+    let full = LimitRingGeometry(percent: 100, size: 72, lineWidth: 8)
+
+    XCTAssertEqual(empty.trimmedFraction, 0)
+    XCTAssertFalse(empty.usesRoundCaps)
+    XCTAssertEqual(small.trimmedFraction, 0.02, accuracy: 0.000_001)
+    XCTAssertFalse(small.usesRoundCaps)
+    XCTAssertLessThan(half.trimmedFraction, 0.5)
+    XCTAssertTrue(half.usesRoundCaps)
+    XCTAssertEqual(full.trimmedFraction, 1)
+    XCTAssertTrue(full.usesRoundCaps)
+  }
+
+  func testPopoverLeftEdgeTracksStatusItemAndClampsToScreen() {
+    let screen = CGRect(x: 0, y: 0, width: 1_494, height: 934)
+
+    XCTAssertEqual(
+      PopoverAnchorGeometry.alignedOriginX(
+        statusItemLeft: 25,
+        popoverWidth: 386,
+        screenFrame: screen
+      ),
+      25
+    )
+    XCTAssertEqual(
+      PopoverAnchorGeometry.alignedOriginX(
+        statusItemLeft: 1_400,
+        popoverWidth: 386,
+        screenFrame: screen
+      ),
+      1_108
+    )
+  }
+
+  @MainActor
+  func testScheduledSparkleChecksNeverOwnWindowOrdering() {
+    XCTAssertFalse(
+      AppUpdaterControllerDelegate.shouldAllowScheduledUpdateWindow(
+        immediateFocus: true
+      )
+    )
+    XCTAssertFalse(
+      AppUpdaterControllerDelegate.shouldAllowScheduledUpdateWindow(
+        immediateFocus: false
+      )
+    )
+
+    let delegate = AppUpdaterControllerDelegate()
+    XCTAssertTrue(delegate.supportsGentleScheduledUpdateReminders)
+    XCTAssertTrue(
+      delegate.responds(
+        to: NSSelectorFromString(
+          "standardUserDriverShouldHandleShowingScheduledUpdate:andInImmediateFocus:"
+        )
+      )
+    )
+    XCTAssertTrue(
+      delegate.responds(
+        to: NSSelectorFromString("standardUserDriverRequestsVersionDisplayer")
+      )
+    )
+  }
+
   func testMenuBarGlyphDrainsFromTopLeftTowardBottomRight() {
     XCTAssertFalse(MenuBarLimitGlyphImage.isFilledCell(0, filledCells: 2))
     XCTAssertFalse(MenuBarLimitGlyphImage.isFilledCell(6, filledCells: 2))
@@ -205,12 +507,16 @@ final class RateLimitTests: XCTestCase {
                         "codex": {
                             "limitId": "codex",
                             "limitName": None,
-                            "primary": {"usedPercent": 60, "windowDurationMins": 10080, "resetsAt": 1777986630},
-                            "secondary": None,
+                            "primary": {"usedPercent": 8, "windowDurationMins": 300, "resetsAt": 1777762101},
+                            "secondary": {"usedPercent": 60, "windowDurationMins": 10080, "resetsAt": 1777986630},
                             "credits": {"hasCredits": False, "unlimited": False, "balance": "0"},
                             "planType": "pro",
                             "rateLimitReachedType": None
                         }
+                    },
+                    "rateLimitResetCredits": {
+                        "availableCount": 3,
+                        "credits": [{"status": "available", "grantedAt": 1781654400, "expiresAt": 1784246400}]
                     }
                 }
             }), flush=True)
@@ -226,6 +532,8 @@ final class RateLimitTests: XCTestCase {
 
     XCTAssertEqual(snapshot.remainingPercent, 40, accuracy: 0.001)
     XCTAssertEqual(snapshot.sourcePath, executable.path)
+    XCTAssertEqual(envelope.rateLimitResetCredits?.availableCount, 3)
+    XCTAssertEqual(envelope.rateLimitResetCredits?.credits?.first?.expiryDate, Date(timeIntervalSince1970: 1784246400))
   }
 
   func testAppServerClientTimesOutWhenServerDoesNotAnswer() async throws {
@@ -325,6 +633,50 @@ final class RateLimitTests: XCTestCase {
     return executable
   }
 
+  private func temporaryRateLimitFixture(expiresAt: Date) throws -> URL {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: directory,
+      withIntermediateDirectories: true
+    )
+
+    let fixture = directory.appendingPathComponent("rate-limits.json")
+    let resetsAt = Int(Date().addingTimeInterval(4 * 24 * 60 * 60).timeIntervalSince1970)
+    let expiry = Int(expiresAt.timeIntervalSince1970)
+    let json = """
+    {"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":39,"windowDurationMins":10080,"resetsAt":\(resetsAt)},"secondary":null}},"rateLimitResetCredits":{"availableCount":1,"credits":[{"status":"available","grantedAt":\(expiry - 86_400),"expiresAt":\(expiry)}]}}
+    """
+    try json.write(to: fixture, atomically: true, encoding: .utf8)
+    return fixture
+  }
+
+  private func waitForNotificationEvent(
+    _ event: DelayedNotificationService.Event,
+    in notifier: DelayedNotificationService
+  ) async throws {
+    for _ in 0..<100 {
+      if await notifier.hasEvent(event) {
+        return
+      }
+      try await Task.sleep(nanoseconds: 10_000_000)
+    }
+    XCTFail("Timed out waiting for \(event)")
+  }
+
+  private func waitForNotificationEventCount(
+    _ count: Int,
+    in notifier: DelayedNotificationService
+  ) async throws {
+    for _ in 0..<100 {
+      if await notifier.eventCount(.resetExpiryAlert) >= count {
+        return
+      }
+      try await Task.sleep(nanoseconds: 10_000_000)
+    }
+    XCTFail("Timed out waiting for \(count) reset-expiry alerts")
+  }
+
   private func snapshot(
     remaining: Double,
     checkedAt: Date = Date(timeIntervalSince1970: 1_000),
@@ -339,7 +691,85 @@ final class RateLimitTests: XCTestCase {
       resetsAt: resetsAt,
       checkedAt: checkedAt,
       planType: "pro",
-      sourcePath: "/codex"
+      sourcePath: "/codex",
+      resetCredits: nil
     )
+  }
+
+  private func resetCredits(
+    availableCount: Int = 5,
+    expiry: Date
+  ) -> RateLimitResetCredits {
+    RateLimitResetCredits(
+      availableCount: availableCount,
+      credits: [RateLimitResetCredit(
+        id: "RateLimitResetCredit_test",
+        resetType: "codexRateLimits",
+        status: "available",
+        grantedAt: expiry.addingTimeInterval(-86_400).timeIntervalSince1970,
+        expiresAt: expiry.timeIntervalSince1970,
+        title: nil,
+        description: nil
+      )]
+    )
+  }
+}
+
+private actor DelayedNotificationService: UserNotificationManaging {
+  enum Event: Equatable {
+    case authorizationStarted
+    case authorizationCompleted
+    case resetExpiryAlert
+  }
+
+  private var events: [Event] = []
+  private var authorizationReleased: Bool
+  private var authorizationContinuation: CheckedContinuation<Void, Never>?
+
+  init(authorizationReleased: Bool = false) {
+    self.authorizationReleased = authorizationReleased
+  }
+
+  func authorizationStatus() async -> NotificationPermissionState {
+    events.append(.authorizationStarted)
+    if !authorizationReleased {
+      await withCheckedContinuation { continuation in
+        authorizationContinuation = continuation
+      }
+    }
+    events.append(.authorizationCompleted)
+    return .authorized
+  }
+
+  func requestAuthorization() async -> NotificationPermissionState {
+    .authorized
+  }
+
+  func notify(
+    _ event: LimitNotificationEvent,
+    previous: RateLimitSnapshot,
+    current: RateLimitSnapshot
+  ) async throws {}
+
+  func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {
+    events.append(.resetExpiryAlert)
+  }
+
+  func releaseAuthorization() {
+    authorizationReleased = true
+    authorizationContinuation?.resume()
+    authorizationContinuation = nil
+  }
+
+  func hasEvent(_ event: Event) -> Bool {
+    events.contains(event)
+  }
+
+  func recordedEvents() -> [Event] {
+    events
+  }
+
+  func eventCount(_ event: Event) -> Int {
+    events.filter { $0 == event }.count
   }
 }

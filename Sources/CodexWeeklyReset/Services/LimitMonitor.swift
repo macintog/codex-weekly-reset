@@ -21,6 +21,7 @@ final class LimitMonitor: ObservableObject {
   private var client: CodexAppServerClient?
   private var clientPath: String?
   private var previousSnapshot: RateLimitSnapshot?
+  private var handledResetExpiryAlerts: Set<ResetCreditExpiryAlert> = []
   private var pollTask: Task<Void, Never>?
   private var hasStarted = false
 
@@ -62,13 +63,9 @@ final class LimitMonitor: ObservableObject {
 
     Task {
       await updateNotificationAuthorization()
-    }
-
-    Task {
       await refresh(trigger: .startup)
       startPolling()
     }
-
   }
 
   func refreshNow() {
@@ -208,7 +205,13 @@ final class LimitMonitor: ObservableObject {
         from: envelope,
         sourcePath: sourcePath
       )
-      apply(snapshot)
+      if envelope.rateLimitResetCredits == nil,
+         let previousSnapshot,
+         previousSnapshot.resetCredits != nil {
+        apply(snapshot.withResetCredits(previousSnapshot.resetCredits))
+      } else {
+        apply(snapshot)
+      }
     } catch {
       lastError = error.localizedDescription
     }
@@ -220,6 +223,21 @@ final class LimitMonitor: ObservableObject {
     if let previous, let event = LimitNotificationPolicy.event(previous: previous, current: snapshot) {
       Task {
         try? await notifier.notify(event, previous: previous, current: snapshot)
+        notificationState = await notifier.authorizationStatus()
+      }
+    }
+
+    if let alert = ResetCreditExpiryPolicy.alert(
+      resetCredits: snapshot.resetCredits,
+      now: snapshot.checkedAt
+    ), handledResetExpiryAlerts.insert(alert).inserted {
+      let availableCount = snapshot.resetCredits?.availableCount ?? 0
+      Task {
+        do {
+          try await notifier.notify(alert, availableCount: availableCount)
+        } catch {
+          handledResetExpiryAlerts.remove(alert)
+        }
         notificationState = await notifier.authorizationStatus()
       }
     }

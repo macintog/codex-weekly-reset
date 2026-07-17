@@ -20,6 +20,56 @@ struct RateLimitCredits: Codable, Equatable, Sendable {
   let balance: String?
 }
 
+struct RateLimitResetCredit: Codable, Equatable, Sendable {
+  let id: String?
+  let resetType: String?
+  let status: String?
+  let grantedAt: TimeInterval?
+  let expiresAt: TimeInterval?
+  let title: String?
+  let description: String?
+
+  var grantedDate: Date? {
+    grantedAt.map(Date.init(timeIntervalSince1970:))
+  }
+
+  var expiryDate: Date? {
+    expiresAt.map(Date.init(timeIntervalSince1970:))
+  }
+
+  var isAvailable: Bool {
+    status == "available"
+  }
+}
+
+struct RateLimitResetCredits: Codable, Equatable, Sendable {
+  let availableCount: Int
+  let credits: [RateLimitResetCredit]?
+
+  init(availableCount: Int, credits: [RateLimitResetCredit]? = nil) {
+    self.availableCount = availableCount
+    self.credits = credits
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    availableCount = try container.decodeIfPresent(Int.self, forKey: .availableCount) ?? 0
+    credits = try container.decodeIfPresent([RateLimitResetCredit].self, forKey: .credits)
+  }
+
+  var earliestAvailableExpiry: Date? {
+    credits?
+      .filter(\.isAvailable)
+      .compactMap(\.expiryDate)
+      .min()
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case availableCount
+    case credits
+  }
+}
+
 struct RateLimitBucket: Codable, Equatable, Sendable {
   let limitId: String
   let limitName: String?
@@ -28,11 +78,27 @@ struct RateLimitBucket: Codable, Equatable, Sendable {
   let credits: RateLimitCredits?
   let planType: String?
   let rateLimitReachedType: String?
+
+  var weeklyWindow: RateLimitWindow? {
+    let weeklyDurationMins = 7 * 24 * 60
+
+    if let secondary, secondary.windowDurationMins == weeklyDurationMins {
+      return secondary
+    }
+    if let primary, primary.windowDurationMins == weeklyDurationMins {
+      return primary
+    }
+
+    // Older app-server versions consistently placed the weekly window in
+    // secondary, even when the reported duration was not exactly seven days.
+    return secondary
+  }
 }
 
 struct RateLimitsEnvelope: Codable, Equatable, Sendable {
   let rateLimits: RateLimitBucket?
   let rateLimitsByLimitId: [String: RateLimitBucket]?
+  let rateLimitResetCredits: RateLimitResetCredits?
 }
 
 struct RateLimitSnapshot: Codable, Equatable, Sendable {
@@ -45,6 +111,7 @@ struct RateLimitSnapshot: Codable, Equatable, Sendable {
   let checkedAt: Date
   let planType: String?
   let sourcePath: String
+  let resetCredits: RateLimitResetCredits?
 
   var remainingRounded: Int {
     Int(remainingPercent.rounded())
@@ -52,6 +119,21 @@ struct RateLimitSnapshot: Codable, Equatable, Sendable {
 
   var usedRounded: Int {
     Int(usedPercent.rounded())
+  }
+
+  func withResetCredits(_ resetCredits: RateLimitResetCredits?) -> RateLimitSnapshot {
+    RateLimitSnapshot(
+      limitId: limitId,
+      limitName: limitName,
+      usedPercent: usedPercent,
+      remainingPercent: remainingPercent,
+      windowDurationMins: windowDurationMins,
+      resetsAt: resetsAt,
+      checkedAt: checkedAt,
+      planType: planType,
+      sourcePath: sourcePath,
+      resetCredits: resetCredits
+    )
   }
 
   static func mainCodexWeekly(
@@ -70,11 +152,7 @@ struct RateLimitSnapshot: Codable, Equatable, Sendable {
       throw RateLimitSelectionError.missingMainCodexBucket
     }
 
-    let weekly = [bucket.primary, bucket.secondary]
-      .compactMap { $0 }
-      .first { $0.windowDurationMins == 10_080 }
-
-    guard let weekly else {
+    guard let weekly = bucket.weeklyWindow else {
       throw RateLimitSelectionError.missingWeeklyWindow
     }
 
@@ -87,7 +165,8 @@ struct RateLimitSnapshot: Codable, Equatable, Sendable {
       resetsAt: weekly.resetDate,
       checkedAt: checkedAt,
       planType: bucket.planType,
-      sourcePath: sourcePath
+      sourcePath: sourcePath,
+      resetCredits: envelope.rateLimitResetCredits
     )
   }
 }
@@ -126,6 +205,10 @@ enum NotificationPermissionState: String, Codable, Equatable, Sendable {
     case .unknown:
       return "Unknown"
     }
+  }
+
+  var allowsDelivery: Bool {
+    self == .authorized || self == .provisional
   }
 }
 
