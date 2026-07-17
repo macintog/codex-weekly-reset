@@ -1,0 +1,52 @@
+<?xml version="1.0" standalone="yes"?>
+<!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+-->
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Codex Weekly Reset</title>
+        <item>
+            <title>0.1.2</title>
+            <pubDate>Fri, 17 Jul 2026 13:47:01 -0400</pubDate>
+            <link>https://macintog.github.io/codex-weekly-reset/</link>
+            <sparkle:version>123</sparkle:version>
+            <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description><![CDATA[<h1>Codex Weekly Reset 0.1.2</h1>
+<ul>
+  <li>See your available banked resets and the next expiry beside the regular weekly reset.</li>
+  <li>Get a clear one-day warning and a final one-hour alert before a banked reset expires.</li>
+  <li>See accurate ring progress and consistent popover placement beneath the menu bar item.</li>
+  <li>Receive future signed updates automatically, or check manually from the popover.</li>
+</ul>
+]]></description>
+            <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset-v0.1.2-b123.zip" length="3495700" type="application/octet-stream" sparkle:edSignature="lEQna7Qy1T5T0hcQ5m2rrefn7c7pGPThUs340beDzv9nTmRsR4zeeibZSRhTXggLr5wzH5sbiEhsBIH+Z9XLAw=="/>
+            <sparkle:deltas>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset123-122.delta" sparkle:deltaFrom="122" length="1517582" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="qFtTq4nWF+03B8N0GQMOQAbZhVnh0nEN0oOsDJOIEmTCnbXaaxICtfThjH5w5MLN0AVEt2m2UBAoc55rFIYxDw=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
+            <title>0.1.2</title>
+            <pubDate>Fri, 17 Jul 2026 13:37:13 -0400</pubDate>
+            <link>https://macintog.github.io/codex-weekly-reset/</link>
+            <sparkle:version>122</sparkle:version>
+            <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description><![CDATA[<h1>Codex Weekly Reset 0.1.2</h1>
+<ul>
+  <li>See your available banked resets and the next expiry beside the regular weekly reset.</li>
+  <li>Get a clear one-day warning and a final one-hour alert before a banked reset expires.</li>
+  <li>See accurate ring progress and consistent popover placement beneath the menu bar item.</li>
+  <li>Receive future signed updates automatically, or check manually from the popover.</li>
+</ul>
+]]></description>
+            <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset-v0.1.2-b122.zip" length="2033553" type="application/octet-stream" sparkle:edSignature="Z2fSuDJz7FfxFn4fMaByCQuaDlZGodyEuh3xtP5CbPOFhmpkU3LJzau2kWhFrwQvomkaecOwM/qdke7l8FnnAg=="/>
+        </item>
+    </channel>
+</rss>
+<!-- sparkle-signatures:
+edSignature: 6JtNe6wJGjbpaEKJIrXRgPVLkpG9qPCggmrM1uaJDbXWaoNXCrCJ0y0DzUdpHg8hU3HxPcXnkpgC6WUhbIm1CQ==
+length: 3401
+-->
