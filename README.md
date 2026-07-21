@@ -16,17 +16,13 @@ This is an independent utility. It is not affiliated with, endorsed by, or suppo
 
 ## Download
 
-[**Download Codex Weekly Reset 0.1.2**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
+[**Download Codex Weekly Reset 0.1.3**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
 
-Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.2 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.2).
+Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.3 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.3).
 
-## What’s New in 0.1.2
+## What’s New in 0.1.3
 
-- **Banked resets at a glance.** See the available count and next expiry beside the regularly scheduled weekly reset.
-- **Warnings before a reset expires.** The expiry row turns amber within 24 hours and red within one hour. Every launch shows the currently eligible warning, without repeating it during that run.
-- **A clearer, more accurate popover.** Quota and reset information lead the hierarchy, the progress ring reflects the exact percentage, and the popover stays aligned beneath its menu bar item.
-- **Reliable reporting with current Codex releases.** Weekly capacity and reset timing load from the current live response format.
-- **Automatic updates.** Future signed releases can install through the app, with a manual check available in the popover.
+- **Clearer banked reset expirations.** See whether the next banked reset expires this week, next week, or later without guessing.
 
 ## Run
 

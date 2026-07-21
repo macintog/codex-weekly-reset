@@ -350,7 +350,7 @@ struct ResetCreditPresentation: Equatable {
 
     if let expiry = resetCredits.earliestAvailableExpiry {
       let formattedExpiry = expiryAlert == nil
-        ? DisplayFormatters.resetDayAndTime.string(from: expiry)
+        ? DisplayFormatters.bankedResetExpiryDayAndTime(expiry, now: now)
         : DisplayFormatters.alertResetDayAndTime(expiry, now: now)
       expiryText = "Next reset expires " + formattedExpiry
     } else {

@@ -43,6 +43,56 @@ enum DisplayFormatters {
     return "\(day) at \(resetTime.string(from: date))"
   }
 
+  static func bankedResetExpiryDayAndTime(
+    _ date: Date,
+    now: Date = Date(),
+    calendar: Calendar = .autoupdatingCurrent,
+    locale: Locale = .autoupdatingCurrent
+  ) -> String {
+    let weekday = localizedDatePart("EEEE", date: date, calendar: calendar, locale: locale)
+    let time = localizedTime(date, calendar: calendar, locale: locale)
+
+    if let endOfFirstWeek = calendar.date(byAdding: .day, value: 7, to: now),
+       date <= endOfFirstWeek {
+      return "\(weekday) at \(time)"
+    }
+
+    if let endOfSecondWeek = calendar.date(byAdding: .day, value: 14, to: now),
+       date <= endOfSecondWeek {
+      return "next \(weekday) at \(time)"
+    }
+
+    let monthAndDay = localizedDatePart("Md", date: date, calendar: calendar, locale: locale)
+    return "on \(monthAndDay) at \(time)"
+  }
+
+  private static func localizedDatePart(
+    _ template: String,
+    date: Date,
+    calendar: Calendar,
+    locale: Locale
+  ) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = calendar
+    formatter.locale = locale
+    formatter.timeZone = calendar.timeZone
+    formatter.setLocalizedDateFormatFromTemplate(template)
+    return formatter.string(from: date)
+  }
+
+  private static func localizedTime(
+    _ date: Date,
+    calendar: Calendar,
+    locale: Locale
+  ) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = calendar
+    formatter.locale = locale
+    formatter.timeZone = calendar.timeZone
+    formatter.timeStyle = .short
+    return formatter.string(from: date)
+  }
+
   static func percentage(_ value: Double) -> String {
     "\(Int(value.rounded()))%"
   }

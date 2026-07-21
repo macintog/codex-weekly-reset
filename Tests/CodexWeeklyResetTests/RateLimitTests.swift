@@ -84,6 +84,73 @@ final class RateLimitTests: XCTestCase {
     XCTAssertNil(many.expiryText)
   }
 
+  func testBankedResetExpiryPresentationDistinguishesFirstSecondAndLaterWeeks() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let locale = Locale(identifier: "en_US")
+    let now = calendar.date(from: DateComponents(
+      year: 2024,
+      month: 7,
+      day: 21,
+      hour: 15,
+      minute: 10
+    ))!
+    func normalized(_ value: String) -> String {
+      value.replacingOccurrences(of: "\u{202F}", with: " ")
+    }
+
+    XCTAssertEqual(
+      normalized(DisplayFormatters.bankedResetExpiryDayAndTime(
+        calendar.date(byAdding: .day, value: 7, to: now)!,
+        now: now,
+        calendar: calendar,
+        locale: locale
+      )),
+      "Sunday at 3:10 PM"
+    )
+    XCTAssertEqual(
+      normalized(DisplayFormatters.bankedResetExpiryDayAndTime(
+        calendar.date(byAdding: .day, value: 8, to: now)!,
+        now: now,
+        calendar: calendar,
+        locale: locale
+      )),
+      "next Monday at 3:10 PM"
+    )
+    XCTAssertEqual(
+      normalized(DisplayFormatters.bankedResetExpiryDayAndTime(
+        calendar.date(byAdding: .day, value: 14, to: now)!,
+        now: now,
+        calendar: calendar,
+        locale: locale
+      )),
+      "next Sunday at 3:10 PM"
+    )
+    XCTAssertEqual(
+      normalized(DisplayFormatters.bankedResetExpiryDayAndTime(
+        calendar.date(byAdding: .day, value: 15, to: now)!,
+        now: now,
+        calendar: calendar,
+        locale: locale
+      )),
+      "on 8/5 at 3:10 PM"
+    )
+  }
+
+  func testBankedResetExpiryPresentationLocalizesMonthDayOrder() {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    let now = calendar.date(from: DateComponents(year: 2024, month: 7, day: 21))!
+    let expiry = calendar.date(byAdding: .day, value: 15, to: now)!
+
+    XCTAssertTrue(DisplayFormatters.bankedResetExpiryDayAndTime(
+      expiry,
+      now: now,
+      calendar: calendar,
+      locale: Locale(identifier: "en_GB")
+    ).hasPrefix("on 05/08"))
+  }
+
   func testResetExpiryPolicyUsesOneDayWarningAndOneHourCriticalAlert() {
     let now = Date(timeIntervalSince1970: 10_000)
 
