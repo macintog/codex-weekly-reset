@@ -6,6 +6,26 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Codex Weekly Reset</title>
         <item>
+            <title>0.1.4</title>
+            <pubDate>Tue, 21 Jul 2026 19:48:41 -0400</pubDate>
+            <link>https://macintog.github.io/codex-weekly-reset/</link>
+            <sparkle:version>128</sparkle:version>
+            <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description><![CDATA[<h1>Codex Weekly Reset 0.1.4</h1>
+<ul>
+  <li><strong>0.1.4:</strong> When you check for an update, its window now comes to the front instead of getting lost behind other windows.</li>
+</ul>
+]]></description>
+            <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset-v0.1.4-b128.zip" length="3499081" type="application/octet-stream" sparkle:edSignature="S/W25DaapQVLlpjCd1RCmTbL8OMwDv5r1B+YwyTmO1wKlqbcUA5NfkymVt2H+2ofNywz8Q1fhZqMXqLgK9VmCA=="/>
+            <sparkle:deltas>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset128-126.delta" sparkle:deltaFrom="126" length="61378" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="pTnX8KCKxMN0XL7DYoi4oT57l0RcFP+OlAbTehO3eFNqqd9bMXqacc2/XpE+zgR/of09Ced8XxtSl8SmG123Ag=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset128-123.delta" sparkle:deltaFrom="123" length="77226" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="MxH12tTuwEzm1PD7c5RaPk1pupVn25f1hSkMVkeJ7m1VOpqvAGMeWH/hXQsDQx6LZfBDcml0t+dzv6qpG9LJDQ=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset128-122.delta" sparkle:deltaFrom="122" length="1583770" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="RSNX5X5c6S8rxMGwhfFSxVYYap0wSWLXP+ec5vZEAuvU7WjAWLRkM5HSFhGwV351wjXyS4Jp9KuGn+a7U45hAQ=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.1.3</title>
             <pubDate>Tue, 21 Jul 2026 19:05:21 -0400</pubDate>
             <link>https://macintog.github.io/codex-weekly-reset/</link>
@@ -45,27 +65,9 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
                 <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset123-122.delta" sparkle:deltaFrom="122" length="1517582" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="qFtTq4nWF+03B8N0GQMOQAbZhVnh0nEN0oOsDJOIEmTCnbXaaxICtfThjH5w5MLN0AVEt2m2UBAoc55rFIYxDw=="/>
             </sparkle:deltas>
         </item>
-        <item>
-            <title>0.1.2</title>
-            <pubDate>Fri, 17 Jul 2026 13:37:13 -0400</pubDate>
-            <link>https://macintog.github.io/codex-weekly-reset/</link>
-            <sparkle:version>122</sparkle:version>
-            <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description><![CDATA[<h1>Codex Weekly Reset 0.1.2</h1>
-<ul>
-  <li>See your available banked resets and the next expiry beside the regular weekly reset.</li>
-  <li>Get a clear one-day warning and a final one-hour alert before a banked reset expires.</li>
-  <li>See accurate ring progress and consistent popover placement beneath the menu bar item.</li>
-  <li>Receive future signed updates automatically, or check manually from the popover.</li>
-</ul>
-]]></description>
-            <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset-v0.1.2-b122.zip" length="2033553" type="application/octet-stream" sparkle:edSignature="Z2fSuDJz7FfxFn4fMaByCQuaDlZGodyEuh3xtP5CbPOFhmpkU3LJzau2kWhFrwQvomkaecOwM/qdke7l8FnnAg=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: kAZyMGb5D08hua6Vo09M2WrdupOPpW9XJv8WlxxiexULz5dNrcN0W8Mju3i2CSe9ZSNjAV3+sGeJ3NSfdyDqBQ==
-length: 5304
+edSignature: fATQj5kheWBbcwNJfKMZQlDdrWdLI+fxvpGncXZowbpv9UPNk+L0cj0I0H3MTdzdhou1kITuMtkDwlUy7PMcAA==
+length: 6362
 -->

@@ -9,7 +9,7 @@ APP_ARGS=("$@")
 PRODUCT_NAME="CodexWeeklyReset"
 APP_NAME="Codex Weekly Reset"
 BUNDLE_ID="com.macintog.codexweeklyreset"
-VERSION="0.1.3"
+VERSION="0.1.4"
 MIN_SYSTEM_VERSION="14.0"
 SPARKLE_FEED_URL="https://macintog.github.io/codex-weekly-reset/appcast.xml"
 SPARKLE_PUBLIC_ED_KEY="bER9pCOTM3mGPhd0hAgk7wfm+ZmHfKULAJcObpdNkBI=" # gitleaks:allow - public verification key

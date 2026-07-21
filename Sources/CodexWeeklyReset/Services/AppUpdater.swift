@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Sparkle
 
@@ -64,6 +65,16 @@ final class AppUpdater: ObservableObject {
         self?.availableUpdate = nil
       }
     }
+    updaterDelegate.userInitiatedUpdateHandler = { [weak updaterController] in
+      DispatchQueue.main.async { [weak updaterController] in
+        guard let updaterController else {
+          return
+        }
+
+        NSApp.activate(ignoringOtherApps: true)
+        updaterController.userDriver.showUpdateInFocus()
+      }
+    }
 
     canCheckObservation = updaterController.updater
       .publisher(for: \SPUUpdater.canCheckForUpdates)
@@ -83,12 +94,20 @@ final class AppUpdater: ObservableObject {
 final class AppUpdaterControllerDelegate: NSObject, SPUStandardUserDriverDelegate, SPUUpdaterDelegate {
   nonisolated(unsafe) var scheduledUpdateHandler: ((String, String) -> Void)?
   nonisolated(unsafe) var clearScheduledUpdateHandler: (() -> Void)?
+  nonisolated(unsafe) var userInitiatedUpdateHandler: (() -> Void)?
   nonisolated(unsafe) private let versionDisplayer = BuildAwareVersionDisplayer()
 
   nonisolated static func shouldAllowScheduledUpdateWindow(
     immediateFocus: Bool
   ) -> Bool {
     false
+  }
+
+  nonisolated static func shouldRefocusUserInitiatedUpdateWindow(
+    handleShowingUpdate: Bool,
+    userInitiated: Bool
+  ) -> Bool {
+    handleShowingUpdate && userInitiated
   }
 
   nonisolated var supportsGentleScheduledUpdateReminders: Bool {
@@ -109,6 +128,14 @@ final class AppUpdaterControllerDelegate: NSObject, SPUStandardUserDriverDelegat
     forUpdate update: SUAppcastItem,
     state: SPUUserUpdateState
   ) {
+    if Self.shouldRefocusUserInitiatedUpdateWindow(
+      handleShowingUpdate: handleShowingUpdate,
+      userInitiated: state.userInitiated
+    ) {
+      userInitiatedUpdateHandler?()
+      return
+    }
+
     guard !handleShowingUpdate, !state.userInitiated else {
       return
     }
