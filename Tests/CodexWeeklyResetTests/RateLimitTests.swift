@@ -524,6 +524,24 @@ final class RateLimitTests: XCTestCase {
         immediateFocus: false
       )
     )
+    XCTAssertTrue(
+      AppUpdaterControllerDelegate.shouldRefocusUserInitiatedUpdateWindow(
+        handleShowingUpdate: true,
+        userInitiated: true
+      )
+    )
+    XCTAssertFalse(
+      AppUpdaterControllerDelegate.shouldRefocusUserInitiatedUpdateWindow(
+        handleShowingUpdate: false,
+        userInitiated: true
+      )
+    )
+    XCTAssertFalse(
+      AppUpdaterControllerDelegate.shouldRefocusUserInitiatedUpdateWindow(
+        handleShowingUpdate: true,
+        userInitiated: false
+      )
+    )
 
     let delegate = AppUpdaterControllerDelegate()
     XCTAssertTrue(delegate.supportsGentleScheduledUpdateReminders)

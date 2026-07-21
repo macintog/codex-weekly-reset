@@ -16,13 +16,15 @@ This is an independent utility. It is not affiliated with, endorsed by, or suppo
 
 ## Download
 
-[**Download Codex Weekly Reset 0.1.3**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
+[**Download Codex Weekly Reset 0.1.4**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
 
-Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.3 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.3).
+Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.4 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.4).
 
-## What’s New in 0.1.3
+## What’s New
 
-- **Clearer banked reset expirations.** See whether the next banked reset expires this week, next week, or later without guessing.
+- **0.1.4:** When you check for an update, its window now comes to the front instead of getting lost behind other windows.
+
+- **0.1.3:** See whether the next banked reset expires this week, next week, or later without guessing.
 
 ## Run
 
