@@ -11,7 +11,7 @@ struct BuildIdentity {
   static var current: BuildIdentity {
     let info = Bundle.main.infoDictionary ?? [:]
     return BuildIdentity(
-      version: info["CFBundleShortVersionString"] as? String ?? "0.1.4",
+      version: info["CFBundleShortVersionString"] as? String ?? "0.1.5",
       build: info["CFBundleVersion"] as? String ?? "dev"
     )
   }

@@ -214,6 +214,65 @@ final class RateLimitTests: XCTestCase {
     )
   }
 
+  func testResetGrantPolicySuppressesStartupAndDetectsCountIncrease() throws {
+    let first = snapshot(
+      remaining: 50,
+      resetCredits: RateLimitResetCredits(availableCount: 1)
+    )
+    let second = snapshot(
+      remaining: 50,
+      checkedAt: Date(timeIntervalSince1970: 2_000),
+      resetCredits: RateLimitResetCredits(availableCount: 2)
+    )
+
+    XCTAssertNil(ResetCreditGrantPolicy.alert(previous: nil, current: first))
+
+    let alert = try XCTUnwrap(ResetCreditGrantPolicy.alert(previous: first, current: second))
+    XCTAssertEqual(alert.newlyAvailableCount, 1)
+    XCTAssertEqual(alert.availableCount, 2)
+    XCTAssertEqual(alert.title, "New Codex reset available")
+    XCTAssertEqual(alert.body, "You now have 2 banked resets available.")
+  }
+
+  func testResetGrantPolicyDetectsNewCreditWhenAvailableCountIsUnchanged() throws {
+    let previousCredits = RateLimitResetCredits(
+      availableCount: 1,
+      credits: [resetCredit(id: "old")]
+    )
+    let currentCredits = RateLimitResetCredits(
+      availableCount: 1,
+      credits: [
+        resetCredit(id: "old", status: "redeemed"),
+        resetCredit(id: "new")
+      ]
+    )
+
+    let alert = try XCTUnwrap(ResetCreditGrantPolicy.alert(
+      previous: snapshot(remaining: 50, resetCredits: previousCredits),
+      current: snapshot(remaining: 50, resetCredits: currentCredits)
+    ))
+
+    XCTAssertEqual(alert.newlyAvailableCount, 1)
+    XCTAssertEqual(alert.availableCount, 1)
+  }
+
+  func testResetGrantPolicyIgnoresUnchangedCreditsAndNewDetailRows() {
+    let summary = RateLimitResetCredits(availableCount: 1)
+    let detailed = RateLimitResetCredits(
+      availableCount: 1,
+      credits: [resetCredit(id: "existing")]
+    )
+
+    XCTAssertNil(ResetCreditGrantPolicy.alert(
+      previous: snapshot(remaining: 50, resetCredits: summary),
+      current: snapshot(remaining: 50, resetCredits: detailed)
+    ))
+    XCTAssertNil(ResetCreditGrantPolicy.alert(
+      previous: snapshot(remaining: 50, resetCredits: detailed),
+      current: snapshot(remaining: 50, resetCredits: detailed)
+    ))
+  }
+
   func testNotificationPermissionStatesAllowOnlyDeliverableStatuses() {
     XCTAssertFalse(NotificationPermissionState.notDetermined.allowsDelivery)
     XCTAssertFalse(NotificationPermissionState.denied.allowsDelivery)
@@ -289,6 +348,39 @@ final class RateLimitTests: XCTestCase {
     )
     secondLaunch.start()
     try await waitForNotificationEventCount(2, in: notifier)
+  }
+
+  @MainActor
+  func testMonitorNotifiesOnceWhenResetCountIncreases() async throws {
+    let notifier = DelayedNotificationService(authorizationReleased: true)
+    let expiry = Date().addingTimeInterval(7 * 24 * 60 * 60)
+    let fixture = try temporaryRateLimitFixture(expiresAt: expiry)
+    let monitor = LimitMonitor(
+      configuration: AppConfiguration(
+        configuredCodexPath: nil,
+        fixturePath: fixture.path,
+        notificationOverride: nil,
+        pollInterval: 3_600,
+        disableCodexFallbacks: true
+      ),
+      resolver: CodexExecutableResolver(includeFallbacks: false),
+      notifier: notifier
+    )
+
+    monitor.start()
+    try await waitForNotificationEvent(.authorizationCompleted, in: notifier)
+    try await Task.sleep(nanoseconds: 150_000_000)
+    let startupGrantCount = await notifier.eventCount(.resetGrantAlert)
+    XCTAssertEqual(startupGrantCount, 0)
+
+    try writeRateLimitFixture(at: fixture, availableCount: 2, expiresAt: expiry)
+    monitor.refreshNow()
+    try await waitForNotificationEventCount(1, event: .resetGrantAlert, in: notifier)
+
+    monitor.refreshNow()
+    try await Task.sleep(nanoseconds: 150_000_000)
+    let repeatedGrantCount = await notifier.eventCount(.resetGrantAlert)
+    XCTAssertEqual(repeatedGrantCount, 1)
   }
 
   func testResetExpiryNotificationBodyIsActionable() {
@@ -727,13 +819,21 @@ final class RateLimitTests: XCTestCase {
     )
 
     let fixture = directory.appendingPathComponent("rate-limits.json")
+    try writeRateLimitFixture(at: fixture, availableCount: 1, expiresAt: expiresAt)
+    return fixture
+  }
+
+  private func writeRateLimitFixture(
+    at fixture: URL,
+    availableCount: Int,
+    expiresAt: Date
+  ) throws {
     let resetsAt = Int(Date().addingTimeInterval(4 * 24 * 60 * 60).timeIntervalSince1970)
     let expiry = Int(expiresAt.timeIntervalSince1970)
     let json = """
-    {"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":39,"windowDurationMins":10080,"resetsAt":\(resetsAt)},"secondary":null}},"rateLimitResetCredits":{"availableCount":1,"credits":[{"status":"available","grantedAt":\(expiry - 86_400),"expiresAt":\(expiry)}]}}
+    {"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":39,"windowDurationMins":10080,"resetsAt":\(resetsAt)},"secondary":null}},"rateLimitResetCredits":{"availableCount":\(availableCount),"credits":[{"id":"fixture-credit","status":"available","grantedAt":\(expiry - 86_400),"expiresAt":\(expiry)}]}}
     """
     try json.write(to: fixture, atomically: true, encoding: .utf8)
-    return fixture
   }
 
   private func waitForNotificationEvent(
@@ -751,21 +851,23 @@ final class RateLimitTests: XCTestCase {
 
   private func waitForNotificationEventCount(
     _ count: Int,
+    event: DelayedNotificationService.Event = .resetExpiryAlert,
     in notifier: DelayedNotificationService
   ) async throws {
     for _ in 0..<100 {
-      if await notifier.eventCount(.resetExpiryAlert) >= count {
+      if await notifier.eventCount(event) >= count {
         return
       }
       try await Task.sleep(nanoseconds: 10_000_000)
     }
-    XCTFail("Timed out waiting for \(count) reset-expiry alerts")
+    XCTFail("Timed out waiting for \(count) \(event) events")
   }
 
   private func snapshot(
     remaining: Double,
     checkedAt: Date = Date(timeIntervalSince1970: 1_000),
-    resetsAt: Date = Date(timeIntervalSince1970: 2_000)
+    resetsAt: Date = Date(timeIntervalSince1970: 2_000),
+    resetCredits: RateLimitResetCredits? = nil
   ) -> RateLimitSnapshot {
     RateLimitSnapshot(
       limitId: "codex",
@@ -777,7 +879,22 @@ final class RateLimitTests: XCTestCase {
       checkedAt: checkedAt,
       planType: "pro",
       sourcePath: "/codex",
-      resetCredits: nil
+      resetCredits: resetCredits
+    )
+  }
+
+  private func resetCredit(
+    id: String,
+    status: String = "available"
+  ) -> RateLimitResetCredit {
+    RateLimitResetCredit(
+      id: id,
+      resetType: "codexRateLimits",
+      status: status,
+      grantedAt: 1_000,
+      expiresAt: 10_000,
+      title: nil,
+      description: nil
     )
   }
 
@@ -804,6 +921,7 @@ private actor DelayedNotificationService: UserNotificationManaging {
   enum Event: Equatable {
     case authorizationStarted
     case authorizationCompleted
+    case resetGrantAlert
     case resetExpiryAlert
   }
 
@@ -835,6 +953,10 @@ private actor DelayedNotificationService: UserNotificationManaging {
     previous: RateLimitSnapshot,
     current: RateLimitSnapshot
   ) async throws {}
+
+  func notify(_ alert: ResetCreditGrantAlert) async throws {
+    events.append(.resetGrantAlert)
+  }
 
   func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {
     events.append(.resetExpiryAlert)

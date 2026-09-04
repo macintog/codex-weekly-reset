@@ -100,6 +100,84 @@ enum LimitNotificationEvent: String, Equatable, Sendable {
   }
 }
 
+struct ResetCreditGrantAlert: Equatable, Sendable {
+  let newlyAvailableCount: Int
+  let availableCount: Int
+  let observedAt: Date
+
+  var notificationIdentifier: String {
+    "codex-weekly-reset-reset-granted-\(newlyAvailableCount)-\(Int(observedAt.timeIntervalSince1970))"
+  }
+
+  var title: String {
+    newlyAvailableCount == 1
+      ? "New Codex reset available"
+      : "New Codex resets available"
+  }
+
+  var body: String {
+    let noun = availableCount == 1 ? "reset" : "resets"
+    return "You now have \(availableCount) banked \(noun) available."
+  }
+}
+
+enum ResetCreditGrantPolicy {
+  static func alert(
+    previous: RateLimitSnapshot?,
+    current: RateLimitSnapshot
+  ) -> ResetCreditGrantAlert? {
+    guard let previous, let currentCredits = current.resetCredits else {
+      return nil
+    }
+
+    let previousCredits = previous.resetCredits
+    let countIncrease = max(
+      0,
+      currentCredits.availableCount - (previousCredits?.availableCount ?? 0)
+    )
+    let detailedIncrease = newlyAvailableCreditCount(
+      previous: previousCredits?.credits,
+      current: currentCredits.credits
+    )
+    let newlyAvailableCount = max(countIncrease, detailedIncrease)
+
+    guard newlyAvailableCount > 0, currentCredits.availableCount > 0 else {
+      return nil
+    }
+
+    return ResetCreditGrantAlert(
+      newlyAvailableCount: newlyAvailableCount,
+      availableCount: currentCredits.availableCount,
+      observedAt: current.checkedAt
+    )
+  }
+
+  private static func newlyAvailableCreditCount(
+    previous: [RateLimitResetCredit]?,
+    current: [RateLimitResetCredit]?
+  ) -> Int {
+    guard let previous, let current else {
+      return 0
+    }
+
+    let previousKeys = Set(previous.filter(\.isAvailable).compactMap(creditKey))
+    let currentKeys = Set(current.filter(\.isAvailable).compactMap(creditKey))
+    return currentKeys.subtracting(previousKeys).count
+  }
+
+  private static func creditKey(_ credit: RateLimitResetCredit) -> String? {
+    if let id = credit.id, !id.isEmpty {
+      return "id:\(id)"
+    }
+
+    guard let grantedAt = credit.grantedAt else {
+      return nil
+    }
+
+    return "grant:\(grantedAt):\(credit.expiresAt ?? 0):\(credit.resetType ?? "")"
+  }
+}
+
 struct ResetCreditExpiryAlert: Equatable, Hashable, Sendable {
   enum Level: String, Equatable, Hashable, Sendable {
     case warning

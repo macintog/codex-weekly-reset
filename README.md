@@ -6,7 +6,7 @@ A native macOS menu bar app for seeing how much weekly Codex capacity remains, w
 
 It stays in the menu bar with a small status ring and your remaining weekly percentage. Open the popover for the regular reset time, available banked resets, and the next banked-reset expiry.
 
-Notifications cover the moments worth interrupting you for: low capacity, an exhausted limit, restored capacity, and a banked reset that will expire in one day or one hour. Alert-state expiry times use “today” and “tomorrow” so the deadline is immediately clear.
+Notifications cover the moments worth interrupting you for: low capacity, an exhausted limit, restored capacity, a newly granted banked reset, and a banked reset that will expire in one day or one hour. Alert-state expiry times use “today” and “tomorrow” so the deadline is immediately clear.
 
 The app reads the live Codex app-server response instead of inferring limits from logs or old snapshots. If that read fails, it says so instead of showing a stale number.
 
@@ -16,15 +16,13 @@ This is an independent utility. It is not affiliated with, endorsed by, or suppo
 
 ## Download
 
-[**Download Codex Weekly Reset 0.1.4**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
+[**Download Codex Weekly Reset 0.1.5**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
 
-Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.4 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.4).
+Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.5 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.5).
 
 ## What’s New
 
-- **0.1.4:** When you check for an update, its window now comes to the front instead of getting lost behind other windows.
-
-- **0.1.3:** See whether the next banked reset expires this week, next week, or later without guessing.
+- **0.1.5:** Get notified when Codex gives you a new banked reset.
 
 ## Run
 

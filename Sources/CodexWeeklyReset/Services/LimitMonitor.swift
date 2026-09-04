@@ -227,6 +227,13 @@ final class LimitMonitor: ObservableObject {
       }
     }
 
+    if let alert = ResetCreditGrantPolicy.alert(previous: previous, current: snapshot) {
+      Task {
+        try? await notifier.notify(alert)
+        notificationState = await notifier.authorizationStatus()
+      }
+    }
+
     if let alert = ResetCreditExpiryPolicy.alert(
       resetCredits: snapshot.resetCredits,
       now: snapshot.checkedAt

@@ -6,6 +6,7 @@ protocol UserNotificationManaging {
   func authorizationStatus() async -> NotificationPermissionState
   func requestAuthorization() async -> NotificationPermissionState
   func notify(_ event: LimitNotificationEvent, previous: RateLimitSnapshot, current: RateLimitSnapshot) async throws
+  func notify(_ alert: ResetCreditGrantAlert) async throws
   func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws
 }
 
@@ -75,6 +76,24 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
     logger.info("Submitted reset-expiry alert \(alert.level.rawValue, privacy: .public) for this launch")
   }
 
+  func notify(_ alert: ResetCreditGrantAlert) async throws {
+    try await requireAuthorization()
+
+    let content = UNMutableNotificationContent()
+    content.title = alert.title
+    content.body = alert.body
+    content.sound = .default
+
+    let request = UNNotificationRequest(
+      identifier: alert.notificationIdentifier,
+      content: content,
+      trigger: nil
+    )
+
+    try await center.add(request)
+    logger.info("Submitted notification for \(alert.newlyAvailableCount) newly available reset credits")
+  }
+
   static func resetExpiryRequestIdentifier(
     for alert: ResetCreditExpiryAlert,
     launchIdentifier: String
@@ -122,6 +141,8 @@ struct FixedNotificationService: UserNotificationManaging {
   }
 
   func notify(_ event: LimitNotificationEvent, previous: RateLimitSnapshot, current: RateLimitSnapshot) async throws {}
+
+  func notify(_ alert: ResetCreditGrantAlert) async throws {}
 
   func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {}
 }
