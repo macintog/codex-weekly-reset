@@ -16,6 +16,8 @@ final class LimitMonitor: ObservableObject {
   private let configuration: AppConfiguration
   private let resolver: CodexExecutableResolver
   private let notifier: UserNotificationManaging
+  private let appServerRequestTimeout: TimeInterval
+  private let startupRetryDelayNanoseconds: UInt64
   private let logger = Logger(subsystem: "com.macintog.codexweeklyreset", category: "LimitMonitor")
 
   private var client: CodexAppServerClient?
@@ -23,18 +25,25 @@ final class LimitMonitor: ObservableObject {
   private var previousSnapshot: RateLimitSnapshot?
   private var handledResetExpiryAlerts: Set<ResetCreditExpiryAlert> = []
   private var pollTask: Task<Void, Never>?
+  private var notificationAuthorizationTask: Task<Void, Never>?
   private var hasStarted = false
+  private var needsUpdateRefresh = false
+  private var isUpdateFollowup = false
 
   init(
     configuration: AppConfiguration,
     resolver: CodexExecutableResolver,
     notifier: UserNotificationManaging,
-    buildIdentity: BuildIdentity = .current
+    buildIdentity: BuildIdentity = .current,
+    appServerRequestTimeout: TimeInterval = 8,
+    startupRetryDelayNanoseconds: UInt64 = 250_000_000
   ) {
     self.configuration = configuration
     self.resolver = resolver
     self.notifier = notifier
     self.buildIdentity = buildIdentity
+    self.appServerRequestTimeout = appServerRequestTimeout
+    self.startupRetryDelayNanoseconds = startupRetryDelayNanoseconds
   }
 
   static func live(configuration: AppConfiguration = .live()) -> LimitMonitor {
@@ -61,8 +70,11 @@ final class LimitMonitor: ObservableObject {
     }
     hasStarted = true
 
-    Task {
-      await updateNotificationAuthorization()
+    notificationAuthorizationTask = Task { [weak self] in
+      await self?.updateNotificationAuthorization()
+    }
+    Task { [weak self] in
+      guard let self else { return }
       await refresh(trigger: .startup)
       startPolling()
     }
@@ -137,20 +149,43 @@ final class LimitMonitor: ObservableObject {
 
     defer {
       isRefreshing = false
+      isUpdateFollowup = false
+      needsUpdateRefresh = false
     }
 
-    do {
-      let snapshot = try await readSnapshot()
-      apply(snapshot)
-      lastError = nil
-      logger.info("Updated weekly remaining \(snapshot.remainingPercent, privacy: .public)")
-    } catch {
-      let message = error.localizedDescription
-      lastError = message
-      logger.error("Refresh failed: \(message, privacy: .public)")
-      if state.snapshot == nil {
-        state = .failed(message)
+    for pass in 0..<2 {
+      isUpdateFollowup = pass == 1
+      needsUpdateRefresh = false
+      do {
+        let effectiveTrigger: RefreshTrigger = pass == 0 ? trigger : .update
+        let snapshot = try await readSnapshotWithStartupRecovery(trigger: effectiveTrigger)
+        apply(snapshot)
+        lastError = nil
+        logger.info("Updated weekly remaining \(snapshot.remainingPercent, privacy: .public)")
+      } catch {
+        let message = error.localizedDescription
+        lastError = message
+        logger.error("Refresh failed: \(message, privacy: .public)")
+        if state.snapshot == nil {
+          state = .failed(message)
+        }
       }
+      if !needsUpdateRefresh { break }
+    }
+  }
+
+  private func readSnapshotWithStartupRecovery(trigger: RefreshTrigger) async throws -> RateLimitSnapshot {
+    do {
+      return try await readSnapshot()
+    } catch let error as MonitorError {
+      guard case .startup = trigger,
+            case .appServerReadFailed = error else {
+        throw error
+      }
+
+      logger.info("Retrying startup app-server read after a transient failure")
+      try await Task.sleep(nanoseconds: startupRetryDelayNanoseconds)
+      return try await readSnapshot()
     }
   }
 
@@ -160,7 +195,7 @@ final class LimitMonitor: ObservableObject {
       return try FixtureRateLimitSource.snapshot(from: fixturePath)
     }
 
-    guard let executable = resolver.resolve() else {
+    guard let executable = await resolver.resolve() else {
       sourcePath = "Not found"
       throw MonitorError.codexNotFound
     }
@@ -170,10 +205,13 @@ final class LimitMonitor: ObservableObject {
     if client == nil || clientPath != executable.path {
       await client?.stop()
 
-      let newClient = CodexAppServerClient(executablePath: executable.path)
-      await newClient.setRateLimitUpdateHandler { [weak self] envelope in
+      let newClient = CodexAppServerClient(
+        executablePath: executable.path,
+        requestTimeout: appServerRequestTimeout
+      )
+      await newClient.setRateLimitUpdateHandler { [weak self] update in
         Task { @MainActor in
-          self?.applyUpdatedEnvelope(envelope)
+          await self?.handleRateLimitUpdate(update)
         }
       }
       client = newClient
@@ -199,22 +237,18 @@ final class LimitMonitor: ObservableObject {
     }
   }
 
-  private func applyUpdatedEnvelope(_ envelope: RateLimitsEnvelope) {
-    do {
-      let snapshot = try RateLimitSnapshot.mainCodexWeekly(
-        from: envelope,
-        sourcePath: sourcePath
-      )
-      if envelope.rateLimitResetCredits == nil,
-         let previousSnapshot,
-         previousSnapshot.resetCredits != nil {
-        apply(snapshot.withResetCredits(previousSnapshot.resetCredits))
-      } else {
-        apply(snapshot)
-      }
-    } catch {
-      lastError = error.localizedDescription
+  func handleRateLimitUpdate(_ update: RateLimitUpdate) async {
+    // The protocol permits an absent ID, but a named different bucket cannot
+    // change this utility's main Codex quota.
+    guard update.limitId == nil || update.limitId == "codex" else { return }
+    // One follow-up catches updates received during a read. The final read
+    // coalesces further notifications, including server echoes, so it cannot
+    // recursively trigger reads. A later identical notification is still valid.
+    if isRefreshing {
+      if !isUpdateFollowup { needsUpdateRefresh = true }
+      return
     }
+    await refresh(trigger: .update)
   }
 
   private func apply(_ snapshot: RateLimitSnapshot) {
@@ -222,6 +256,7 @@ final class LimitMonitor: ObservableObject {
 
     if let previous, let event = LimitNotificationPolicy.event(previous: previous, current: snapshot) {
       Task {
+        await notificationAuthorizationTask?.value
         try? await notifier.notify(event, previous: previous, current: snapshot)
         notificationState = await notifier.authorizationStatus()
       }
@@ -229,6 +264,7 @@ final class LimitMonitor: ObservableObject {
 
     if let alert = ResetCreditGrantPolicy.alert(previous: previous, current: snapshot) {
       Task {
+        await notificationAuthorizationTask?.value
         try? await notifier.notify(alert)
         notificationState = await notifier.authorizationStatus()
       }
@@ -240,6 +276,7 @@ final class LimitMonitor: ObservableObject {
     ), handledResetExpiryAlerts.insert(alert).inserted {
       let availableCount = snapshot.resetCredits?.availableCount ?? 0
       Task {
+        await notificationAuthorizationTask?.value
         do {
           try await notifier.notify(alert, availableCount: availableCount)
         } catch {
@@ -259,6 +296,7 @@ enum RefreshTrigger {
   case startup
   case manual
   case scheduled
+  case update
 }
 
 enum MonitorError: LocalizedError {

@@ -6,10 +6,28 @@ if [[ $# -gt 0 ]]; then
   shift
 fi
 APP_ARGS=("$@")
+
+usage() {
+  echo "usage: $0 [run|--build|--debug|--logs|--telemetry|--verify|--developer-id] [app args...]"
+}
+
+case "$MODE" in
+  -h|--help|help)
+    usage
+    exit 0
+    ;;
+  run|--build|build|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify|--developer-id|developer-id)
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
 PRODUCT_NAME="CodexWeeklyReset"
 APP_NAME="Codex Weekly Reset"
 BUNDLE_ID="com.macintog.codexweeklyreset"
-VERSION="0.1.5"
+VERSION="0.1.6"
 MIN_SYSTEM_VERSION="14.0"
 SPARKLE_FEED_URL="https://macintog.github.io/codex-weekly-reset/appcast.xml"
 SPARKLE_PUBLIC_ED_KEY="bER9pCOTM3mGPhd0hAgk7wfm+ZmHfKULAJcObpdNkBI=" # gitleaks:allow - public verification key
@@ -28,9 +46,9 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 APP_ICON_NAME="AppIcon"
 APP_ICONSET_SOURCE="$ROOT_DIR/Resources/$APP_ICON_NAME.iconset"
 APP_ICON_PACKER="$ROOT_DIR/script/pack_icns.py"
+BUILD_PROVENANCE_HELPER="$ROOT_DIR/script/build_provenance.py"
 COUNTER_DIR="${CODEX_WEEKLY_RESET_BUILD_COUNTER_DIR:-$HOME/.codex/build-counters}"
-COUNTER_FILE="$COUNTER_DIR/$BUNDLE_ID"
-LEGACY_COUNTER_FILE="$COUNTER_DIR/com.ryand.codexweeklyreset"
+LEGACY_BUNDLE_ID="com.ryand.codexweeklyreset"
 
 normalize_app_args() {
   local normalized=()
@@ -62,33 +80,30 @@ normalize_app_args() {
 
 normalize_app_args
 
-mkdir -p "$COUNTER_DIR"
-if [[ -f "$COUNTER_FILE" ]]; then
-  CURRENT_BUILD="$(tr -cd '0-9' <"$COUNTER_FILE")"
-else
-  CURRENT_BUILD="0"
-fi
-CURRENT_BUILD="${CURRENT_BUILD:-0}"
-if [[ -f "$LEGACY_COUNTER_FILE" ]]; then
-  LEGACY_BUILD="$(tr -cd '0-9' <"$LEGACY_COUNTER_FILE")"
-  LEGACY_BUILD="${LEGACY_BUILD:-0}"
-  if [[ "$LEGACY_BUILD" -gt "$CURRENT_BUILD" ]]; then
-    CURRENT_BUILD="$LEGACY_BUILD"
-  fi
-fi
-BUILD_NUMBER="$((CURRENT_BUILD + 1))"
-printf '%s\n' "$BUILD_NUMBER" >"$COUNTER_FILE"
+BUILD_NUMBER="$(/usr/bin/python3 "$BUILD_PROVENANCE_HELPER" counter \
+  --directory "$COUNTER_DIR" \
+  --bundle-id "$BUNDLE_ID" \
+  --legacy-id "$LEGACY_BUNDLE_ID")"
 
-pkill -x "$PRODUCT_NAME" >/dev/null 2>&1 || true
+PROVENANCE_SNAPSHOT="$(mktemp "${TMPDIR:-/tmp}/codex-weekly-reset-provenance.XXXXXX")"
+trap 'rm -f "$PROVENANCE_SNAPSHOT"' EXIT
+/usr/bin/python3 "$BUILD_PROVENANCE_HELPER" snapshot --root "$ROOT_DIR" --output "$PROVENANCE_SNAPSHOT"
 
 cd "$ROOT_DIR"
 swift build
 BUILD_BIN_DIR="$(swift build --show-bin-path)"
 BUILD_BINARY="$BUILD_BIN_DIR/$PRODUCT_NAME"
 SPARKLE_FRAMEWORK="$BUILD_BIN_DIR/Sparkle.framework"
+SPARKLE_NOTICES="$ROOT_DIR/Resources/ThirdPartyNotices/Sparkle-LICENSE.txt"
+SPARKLE_DISTRIBUTION_NOTICES="$ROOT_DIR/.build/artifacts/sparkle/Sparkle/LICENSE"
 
 if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
   echo "Sparkle.framework was not emitted beside the SwiftPM executable: $SPARKLE_FRAMEWORK" >&2
+  exit 1
+fi
+
+if ! cmp -s "$SPARKLE_NOTICES" "$SPARKLE_DISTRIBUTION_NOTICES"; then
+  echo "Sparkle notices must match the resolved dependency before packaging." >&2
   exit 1
 fi
 
@@ -98,6 +113,8 @@ cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 /usr/bin/ditto "$SPARKLE_FRAMEWORK" "$APP_FRAMEWORKS/Sparkle.framework"
 /usr/bin/python3 "$APP_ICON_PACKER" "$APP_ICONSET_SOURCE" "$APP_RESOURCES/$APP_ICON_NAME.icns"
+cp "$PROVENANCE_SNAPSHOT" "$APP_RESOURCES/BuildProvenance.json"
+cp "$SPARKLE_NOTICES" "$APP_RESOURCES/Sparkle-LICENSE.txt"
 
 /usr/bin/python3 - "$INFO_PLIST" "$PRODUCT_NAME" "$APP_NAME" "$BUNDLE_ID" "$VERSION" "$BUILD_NUMBER" "$MIN_SYSTEM_VERSION" "$APP_ICON_NAME" "$SPARKLE_FEED_URL" "$SPARKLE_PUBLIC_ED_KEY" <<'PY'
 import plistlib
@@ -126,6 +143,8 @@ plist = {
 with open(path, "wb") as handle:
   plistlib.dump(plist, handle)
 PY
+
+/usr/bin/python3 "$BUILD_PROVENANCE_HELPER" verify --root "$ROOT_DIR" --snapshot "$PROVENANCE_SNAPSHOT"
 
 sign_artifact() {
   local artifact_path="$1"
@@ -180,6 +199,7 @@ case "$MODE" in
 esac
 
 open_app() {
+  pkill -x "$PRODUCT_NAME" >/dev/null 2>&1 || true
   if [[ ${#APP_ARGS[@]} -gt 0 ]]; then
     /usr/bin/open -n "$APP_BUNDLE" --args "${APP_ARGS[@]}"
   else
@@ -191,7 +211,12 @@ case "$MODE" in
   run)
     open_app
     ;;
+  --build|build)
+    /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE" >/dev/null
+    echo "$APP_NAME build $BUILD_NUMBER is ready for local testing: $APP_BUNDLE"
+    ;;
   --debug|debug)
+    pkill -x "$PRODUCT_NAME" >/dev/null 2>&1 || true
     lldb -- "$APP_BINARY"
     ;;
   --logs|logs)
@@ -211,9 +236,5 @@ case "$MODE" in
   --developer-id|developer-id)
     /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE" >/dev/null
     echo "$APP_NAME build $BUILD_NUMBER is signed with Developer ID"
-    ;;
-  *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify|--developer-id] [app args...]" >&2
-    exit 2
     ;;
 esac

@@ -26,13 +26,16 @@ struct AppConfiguration: Equatable {
     let disableFallbacks = arguments.contains("--disable-codex-fallbacks")
       || environment["CODEX_WEEKLY_RESET_DISABLE_CODEX_FALLBACKS"] == "1"
 
-    let interval = intervalText.flatMap(TimeInterval.init) ?? 300
+    let parsedInterval = intervalText.flatMap(TimeInterval.init) ?? 300
+    // Keep the polling sleep representable in nanoseconds and avoid unbounded
+    // intervals from malformed environment or command-line values.
+    let interval = parsedInterval.isFinite ? min(86_400, max(5, parsedInterval)) : 300
 
     return AppConfiguration(
       configuredCodexPath: configuredPath?.nonEmpty,
       fixturePath: fixturePath?.nonEmpty,
       notificationOverride: notificationState.flatMap(NotificationPermissionState.init(rawValue:)),
-      pollInterval: max(5, interval),
+      pollInterval: interval,
       disableCodexFallbacks: disableFallbacks
     )
   }

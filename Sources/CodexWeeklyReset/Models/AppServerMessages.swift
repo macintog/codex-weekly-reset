@@ -44,5 +44,19 @@ struct EmptyParamsRequest: Encodable {
 
 struct RateLimitUpdateNotification: Decodable {
   let method: String
-  let params: RateLimitsEnvelope
+  let params: RateLimitUpdateParams
+}
+
+// Rolling updates may omit account metadata and window fields. They identify
+// what changed; the monitor refetches the complete authoritative snapshot.
+struct RateLimitUpdateParams: Decodable {
+  let rateLimits: Bucket
+
+  struct Bucket: Decodable {
+    let limitId: String?
+  }
+}
+
+struct RateLimitUpdate: Equatable, Sendable {
+  let limitId: String?
 }

@@ -302,6 +302,11 @@ final class RateLimitTests: XCTestCase {
     monitor.start()
     try await waitForNotificationEvent(.authorizationStarted, in: notifier)
     try await Task.sleep(nanoseconds: 150_000_000)
+    XCTAssertEqual(
+      monitor.state.snapshot?.remainingPercent,
+      61,
+      "The first usage read must not wait for notification authorization"
+    )
     let alertedBeforeAuthorization = await notifier.hasEvent(.resetExpiryAlert)
     XCTAssertFalse(alertedBeforeAuthorization)
 

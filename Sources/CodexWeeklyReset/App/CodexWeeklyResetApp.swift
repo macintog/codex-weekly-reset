@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.accessory)
     AppServices.monitor.start()
+    PopoverDiagnostics.record("launch")
     DispatchQueue.main.async {
       PopoverAnchorController.shared.captureStatusItemWindow()
     }
