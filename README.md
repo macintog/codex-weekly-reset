@@ -16,13 +16,13 @@ This is an independent utility. It is not affiliated with, endorsed by, or suppo
 
 ## Download
 
-[**Download Codex Weekly Reset 0.1.5**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
+[**Download Codex Weekly Reset 0.1.6**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
 
-Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.5 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.5).
+Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.6 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.6).
 
 ## What’s New
 
-- **0.1.5:** Get notified when Codex gives you a new banked reset.
+- **0.1.6:** More reliable Codex usage updates and menu bar behavior.
 
 ## Run
 
@@ -33,13 +33,16 @@ Requires macOS 14 or later. The release app is Developer ID signed, Apple-notari
 Useful modes:
 
 ```bash
+./script/build_and_run.sh --build
 ./script/build_and_run.sh --verify
 ./script/build_and_run.sh --logs
 ./script/build_and_run.sh --telemetry
 ./script/build_and_run.sh --developer-id
 ```
 
-`--developer-id` stages the app without launching it and signs it with the MacTC-style Developer ID defaults. Override with `CODEX_WEEKLY_RESET_APPLE_TEAM_ID` or `CODEX_WEEKLY_RESET_DEVELOPER_ID_APPLICATION_IDENTITY` when needed.
+`--build` assembles an ad-hoc signed test app without launching it or stopping the running app. Every build includes a source fingerprint for exact-build promotion.
+
+`--developer-id` stages the app without launching it and signs it with the configured Developer ID identity. Override with `CODEX_WEEKLY_RESET_APPLE_TEAM_ID` or `CODEX_WEEKLY_RESET_DEVELOPER_ID_APPLICATION_IDENTITY` when needed.
 
 ## Test
 
@@ -52,10 +55,3 @@ Fixture mode is available for deterministic UI checks:
 ```bash
 CODEX_WEEKLY_RESET_FIXTURE=/path/to/rate-limits.json ./script/build_and_run.sh --verify
 ```
-
-## Source Of Truth
-
-- `PROJECT_CONTINUITY.md`: durable product intent
-- `CHECKPOINT.md`: current handoff
-- `AGENTS.md`: repo-local working rules
-- `.codex/indexes.toml`: code and docs indexing contract

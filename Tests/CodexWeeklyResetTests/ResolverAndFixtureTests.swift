@@ -3,7 +3,7 @@ import XCTest
 @testable import CodexWeeklyReset
 
 final class ResolverAndFixtureTests: XCTestCase {
-  func testResolverUsesConfiguredPathFirst() {
+  func testResolverUsesConfiguredPathFirst() async {
     let resolver = CodexExecutableResolver(
       configuredPath: "~/bin/codex",
       commandPathProvider: { "/opt/homebrew/bin/codex" },
@@ -13,13 +13,14 @@ final class ResolverAndFixtureTests: XCTestCase {
       launchServicesAppURLProvider: { nil }
     )
 
+    let result = await resolver.resolve()
     XCTAssertEqual(
-      resolver.resolve(),
+      result,
       CodexExecutable(path: "/Users/test/bin/codex", source: "Configured")
     )
   }
 
-  func testResolverFallsBackToApplicationsBeforeLaunchServices() {
+  func testResolverFallsBackToApplicationsBeforeLaunchServices() async {
     let resolver = CodexExecutableResolver(
       configuredPath: nil,
       commandPathProvider: { nil },
@@ -32,8 +33,9 @@ final class ResolverAndFixtureTests: XCTestCase {
       launchServicesAppURLProvider: { URL(fileURLWithPath: "/Resolved/Codex.app") }
     )
 
+    let result = await resolver.resolve()
     XCTAssertEqual(
-      resolver.resolve(),
+      result,
       CodexExecutable(path: "/Applications/Codex.app/Contents/Resources/codex", source: "/Applications")
     )
   }
@@ -54,7 +56,7 @@ final class ResolverAndFixtureTests: XCTestCase {
     XCTAssertFalse(configuration.disableCodexFallbacks)
   }
 
-  func testResolverCanDisableFallbacksForMissingCodexFixtureState() {
+  func testResolverCanDisableFallbacksForMissingCodexFixtureState() async {
     let resolver = CodexExecutableResolver(
       configuredPath: "/missing/codex",
       commandPathProvider: { "/opt/homebrew/bin/codex" },
@@ -64,7 +66,8 @@ final class ResolverAndFixtureTests: XCTestCase {
       launchServicesAppURLProvider: { URL(fileURLWithPath: "/Applications/Codex.app") }
     )
 
-    XCTAssertNil(resolver.resolve())
+    let result = await resolver.resolve()
+    XCTAssertNil(result)
   }
 
   func testFixtureSourceReadsRpcResponseShape() throws {

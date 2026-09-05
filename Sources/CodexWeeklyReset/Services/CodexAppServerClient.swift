@@ -14,7 +14,7 @@ actor CodexAppServerClient {
   private var stderrHandle: FileHandle?
   private var pending: [Int: CheckedContinuation<Data, Error>] = [:]
   private var nextId = 1
-  private var updateHandler: ((RateLimitsEnvelope) -> Void)?
+  private var updateHandler: ((RateLimitUpdate) -> Void)?
   private var stdoutBuffer = Data()
   private var stderrTail = Data()
   private let maxStderrTailBytes = 8 * 1024
@@ -24,7 +24,7 @@ actor CodexAppServerClient {
     self.requestTimeout = requestTimeout
   }
 
-  func setRateLimitUpdateHandler(_ handler: ((RateLimitsEnvelope) -> Void)?) {
+  func setRateLimitUpdateHandler(_ handler: ((RateLimitUpdate) -> Void)?) {
     updateHandler = handler
   }
 
@@ -246,7 +246,7 @@ actor CodexAppServerClient {
         if method == "account/rateLimits/updated",
            let notification = try? decoder.decode(RateLimitUpdateNotification.self, from: line) {
           logger.info("Received app-server rate limit update")
-          updateHandler?(notification.params)
+          updateHandler?(RateLimitUpdate(limitId: notification.params.rateLimits.limitId))
         } else {
           logger.info("Ignored app-server notification \(method, privacy: .public)")
         }

@@ -64,7 +64,10 @@ enum MenuBarLimitGlyphImage {
 
     let color = color(for: presentation.band)
     let outlineColor = NSColor.labelColor
-    let emptyOutlineColor = outlineColor.withAlphaComponent(0.36)
+    // Exhaustion and failures have no filled cells; their outlines must carry
+    // the alarm color so the menu bar does not revert to a neutral empty glyph.
+    let emptyOutlineColor = presentation.band == .alarm || presentation.band == .failed
+      ? color : outlineColor.withAlphaComponent(0.36)
     let cellWidth: CGFloat = 4
     let cellHeight: CGFloat = 3.6
     let slant: CGFloat = 1.05
