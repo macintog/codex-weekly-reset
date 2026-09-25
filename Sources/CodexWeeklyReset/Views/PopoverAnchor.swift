@@ -73,6 +73,8 @@ enum PopoverAnchorGeometry {
 }
 
 struct PopoverWindowReader: NSViewRepresentable {
+  var contentSize: CGSize? = nil
+
   func makeNSView(context: Context) -> WindowReportingView {
     WindowReportingView { window in
       PopoverAnchorController.shared.alignPopoverWindow(window)
@@ -80,6 +82,7 @@ struct PopoverWindowReader: NSViewRepresentable {
   }
 
   func updateNSView(_ nsView: WindowReportingView, context: Context) {
+    nsView.updateContentSize(contentSize)
     nsView.requestAlignment()
   }
 }
@@ -89,7 +92,27 @@ final class WindowReportingView: NSView {
   private let report: @MainActor (NSWindow) -> Void
   private var observers: [NSObjectProtocol] = []
   private var attachmentGeneration = 0
+  // Coalesces both content fitting and the existing horizontal alignment pass.
   private var alignmentPending = false
+  private(set) var measuredContentSize: CGSize?
+  private var applyingFit = false
+  private var lastFit: (target: CGSize, result: CGSize)?
+  private var fitAttempts = 0
+  private let maximumFitAttempts = 2
+  private var previousFrame: NSRect?
+  private var previousMeasuredContentSize: CGSize?
+  private var wasOcclusionVisible = false
+  #if DEBUG
+  private static var didInjectExtraHeight = false
+  #endif
+
+  func updateContentSize(_ size: CGSize?) {
+    guard measuredContentSize != size else { return }
+    measuredContentSize = size
+    lastFit = nil
+    fitAttempts = 0
+    requestAlignment()
+  }
 
   init(report: @escaping @MainActor (NSWindow) -> Void) {
     self.report = report
@@ -109,20 +132,60 @@ final class WindowReportingView: NSView {
     super.viewDidMoveToWindow()
     attachmentGeneration += 1
     alignmentPending = false
+    lastFit = nil
+    fitAttempts = 0
     observers.forEach(NotificationCenter.default.removeObserver)
     observers.removeAll()
-    guard let window else { return }
-    PopoverDiagnostics.record("attached", window: window)
+    guard let window else { previousFrame = nil; return }
+    previousFrame = window.frame
+    previousMeasuredContentSize = measuredContentSize
+    wasOcclusionVisible = window.occlusionState.contains(.visible)
+    PopoverDiagnostics.record("attached", window: window, contentProbe: self, measuredContentSize: measuredContentSize)
 
     // SwiftUI owns presentation and its native frame. Attachment can happen while
     // that frame is provisional; wait for presentation before applying our X offset.
     for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResizeNotification,
-                 NSWindow.didChangeScreenNotification] {
+                 NSWindow.didChangeScreenNotification, NSWindow.didChangeBackingPropertiesNotification,
+                 NSWindow.didChangeOcclusionStateNotification] {
       observers.append(NotificationCenter.default.addObserver(
         forName: name, object: window, queue: .main
       ) { [weak self] _ in
         MainActor.assumeIsolated {
-          self?.requestAlignment()
+          if let self, let window = self.window {
+            let oldFrame = self.previousFrame
+            let previousMeasuredSize = self.previousMeasuredContentSize
+            if name == NSWindow.didResizeNotification, !self.applyingFit {
+              PopoverDiagnostics.recordHeightIncrease(
+                window: window, previousFrame: oldFrame,
+                measuredContentSize: self.measuredContentSize,
+                previousMeasuredContentSize: previousMeasuredSize
+              )
+            }
+            PopoverDiagnostics.record(
+              name.rawValue, window: window, contentProbe: self,
+              measuredContentSize: self.measuredContentSize, previousFrame: oldFrame,
+              captureStack: name == NSWindow.didResizeNotification
+                && oldFrame.map { window.frame.height > $0.height } == true
+            )
+            self.previousFrame = window.frame
+            self.previousMeasuredContentSize = self.measuredContentSize
+          }
+          guard let self, !self.applyingFit else { return }
+          if name == NSWindow.didChangeOcclusionStateNotification {
+            guard let window = self.window else { return }
+            let visible = window.occlusionState.contains(.visible)
+            let newlyVisible = visible && !self.wasOcclusionVisible
+            self.wasOcclusionVisible = visible
+            guard window.isVisible, visible else { return }
+            if newlyVisible {
+              self.lastFit = nil
+              self.fitAttempts = 0
+            }
+          } else if name != NSWindow.didResizeNotification {
+            self.lastFit = nil
+            self.fitAttempts = 0
+          }
+          self.requestAlignment()
         }
       })
     }
@@ -137,7 +200,65 @@ final class WindowReportingView: NSView {
       guard let self, self.attachmentGeneration == generation else { return }
       self.alignmentPending = false
       guard let window, self.window === window, window.isVisible else { return }
+      PopoverDiagnostics.record("content-before-alignment", window: window, contentProbe: self, measuredContentSize: self.measuredContentSize)
+      self.fitContent(in: window)
       self.report(window)
     }
   }
+
+  private func fitContent(in window: NSWindow) {
+    guard let measuredContentSize,
+          let screen = window.screen else { return }
+    let screenContent = window.contentRect(forFrameRect: screen.visibleFrame).size
+    let maximum = CGSize(
+      width: min(screenContent.width, window.contentMaxSize.width),
+      height: min(screenContent.height, window.contentMaxSize.height)
+    )
+    guard let target = PopoverContentGeometry.targetSize(
+      measured: measuredContentSize, maximum: maximum, scale: window.backingScaleFactor
+    ) else { return }
+    PopoverDiagnostics.recordUnexpectedInsets(window: window)
+    injectExtraHeightIfRequested(in: window)
+    let current = window.contentRect(forFrameRect: window.frame).size
+    guard PopoverContentGeometry.differs(current, target, scale: window.backingScaleFactor) else { return }
+    // Native hosts may apply stricter limits than the public maximum. Do not
+    // repeatedly fight an unchanged native result from our own resize.
+    if let lastFit, lastFit.target == target,
+       !PopoverContentGeometry.differs(lastFit.result, current, scale: window.backingScaleFactor) {
+      return
+    }
+    // A native host can accept our size and asynchronously restore its own.
+    // Resize notifications therefore cannot replenish this budget. One retry
+    // allows recovery from an unrelated external resize while continuously open;
+    // further disagreement waits for content, presentation, or display changes.
+    guard fitAttempts < maximumFitAttempts else { return }
+    fitAttempts += 1
+    PopoverDiagnostics.record("fit-before", window: window, contentProbe: self, measuredContentSize: measuredContentSize)
+    applyingFit = true
+    window.setContentSize(target)
+    applyingFit = false
+    lastFit = (target, window.contentRect(forFrameRect: window.frame).size)
+    PopoverDiagnostics.record("fit-after", window: window, contentProbe: self, measuredContentSize: measuredContentSize)
+  }
+
+  private func injectExtraHeightIfRequested(in window: NSWindow) {
+    #if DEBUG
+    guard !Self.didInjectExtraHeight, window.isVisible else { return }
+    let arguments = ProcessInfo.processInfo.arguments
+    guard let index = arguments.firstIndex(of: "--popover-test-extra-height"),
+          arguments.indices.contains(index + 1),
+          let extra = Double(arguments[index + 1]), extra.isFinite,
+          extra > 0, extra <= 1_000 else { return }
+    let current = window.contentRect(forFrameRect: window.frame).size
+    guard current.width.isFinite, current.height.isFinite,
+          current.width > 0, current.height > 0 else { return }
+    Self.didInjectExtraHeight = true
+    applyingFit = true
+    window.setContentSize(CGSize(width: current.width, height: current.height + CGFloat(extra)))
+    applyingFit = false
+    PopoverDiagnostics.record("test-extra-height-injected", window: window,
+                              contentProbe: self, measuredContentSize: measuredContentSize)
+    #endif
+  }
+
 }

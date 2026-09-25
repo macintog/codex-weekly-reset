@@ -21,7 +21,7 @@ final class RateLimitTests: XCTestCase {
     XCTAssertEqual(snapshot.planType, "pro")
     XCTAssertEqual(snapshot.checkedAt, checkedAt)
     XCTAssertEqual(snapshot.resetCredits?.availableCount, 2)
-    XCTAssertEqual(snapshot.resetCredits?.earliestAvailableExpiry, Date(timeIntervalSince1970: 1784246400))
+    XCTAssertEqual(snapshot.resetCredits?.earliestAvailableExpiry(after: Date(timeIntervalSince1970: 0)), Date(timeIntervalSince1970: 1784246400))
   }
 
   func testParsesCurrentLiveShapeWithWeeklyWindowInPrimary() throws {
@@ -38,7 +38,7 @@ final class RateLimitTests: XCTestCase {
     XCTAssertEqual(snapshot.windowDurationMins, 10080)
     XCTAssertEqual(snapshot.resetsAt, Date(timeIntervalSince1970: 1784811085))
     XCTAssertEqual(snapshot.resetCredits?.availableCount, 5)
-    XCTAssertEqual(snapshot.resetCredits?.earliestAvailableExpiry, Date(timeIntervalSince1970: 1784335116))
+    XCTAssertEqual(snapshot.resetCredits?.earliestAvailableExpiry(after: Date(timeIntervalSince1970: 0)), Date(timeIntervalSince1970: 1784335116))
   }
 
   func testResetCreditsUseAuthoritativeCountAndEarliestAvailableExpiry() throws {
@@ -50,7 +50,7 @@ final class RateLimitTests: XCTestCase {
     )
 
     XCTAssertEqual(credits.availableCount, 4)
-    XCTAssertEqual(credits.earliestAvailableExpiry, Date(timeIntervalSince1970: 300))
+    XCTAssertEqual(credits.earliestAvailableExpiry(after: Date(timeIntervalSince1970: 0)), Date(timeIntervalSince1970: 300))
   }
 
   func testResetCreditsWithoutDetailRowsHaveNoExpiry() throws {
@@ -60,7 +60,7 @@ final class RateLimitTests: XCTestCase {
     )
 
     XCTAssertEqual(credits.availableCount, 2)
-    XCTAssertNil(credits.earliestAvailableExpiry)
+    XCTAssertNil(credits.earliestAvailableExpiry(after: Date(timeIntervalSince1970: 0)))
   }
 
   func testResetCreditPresentationUsesPluralizationAndEarliestExpiry() {
@@ -75,7 +75,7 @@ final class RateLimitTests: XCTestCase {
         title: nil,
         description: nil
       )]
-    ))
+    ), now: Date(timeIntervalSince1970: 100))
     let many = ResetCreditPresentation(resetCredits: RateLimitResetCredits(availableCount: 2))
 
     XCTAssertEqual(one.countText, "1 banked reset available")
@@ -84,71 +84,69 @@ final class RateLimitTests: XCTestCase {
     XCTAssertNil(many.expiryText)
   }
 
-  func testBankedResetExpiryPresentationDistinguishesFirstSecondAndLaterWeeks() {
+  func testExpiryUsesExplicitDateInsteadOfAmbiguousNextWeekday() {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     let locale = Locale(identifier: "en_US")
-    let now = calendar.date(from: DateComponents(
-      year: 2024,
-      month: 7,
-      day: 21,
-      hour: 15,
-      minute: 10
-    ))!
-    func normalized(_ value: String) -> String {
-      value.replacingOccurrences(of: "\u{202F}", with: " ")
-    }
+    let now = calendar.date(from: DateComponents(year: 2026, month: 9, day: 24, hour: 15))!
+    let expiry = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5, minute: 19))!
+    let text = DisplayFormatters.bankedResetExpiryDayAndTime(
+      expiry, now: now, calendar: calendar, locale: locale
+    ).replacingOccurrences(of: "\u{202F}", with: " ")
+    XCTAssertEqual(text, "Mon, Oct 5 at 12:19 AM")
 
+    // Moving the clock through an exact seven-day boundary must not change the date label.
+    let boundary = calendar.date(byAdding: .day, value: -7, to: expiry)!
     XCTAssertEqual(
-      normalized(DisplayFormatters.bankedResetExpiryDayAndTime(
-        calendar.date(byAdding: .day, value: 7, to: now)!,
-        now: now,
-        calendar: calendar,
-        locale: locale
-      )),
-      "Sunday at 3:10 PM"
-    )
-    XCTAssertEqual(
-      normalized(DisplayFormatters.bankedResetExpiryDayAndTime(
-        calendar.date(byAdding: .day, value: 8, to: now)!,
-        now: now,
-        calendar: calendar,
-        locale: locale
-      )),
-      "next Monday at 3:10 PM"
-    )
-    XCTAssertEqual(
-      normalized(DisplayFormatters.bankedResetExpiryDayAndTime(
-        calendar.date(byAdding: .day, value: 14, to: now)!,
-        now: now,
-        calendar: calendar,
-        locale: locale
-      )),
-      "next Sunday at 3:10 PM"
-    )
-    XCTAssertEqual(
-      normalized(DisplayFormatters.bankedResetExpiryDayAndTime(
-        calendar.date(byAdding: .day, value: 15, to: now)!,
-        now: now,
-        calendar: calendar,
-        locale: locale
-      )),
-      "on 8/5 at 3:10 PM"
+      DisplayFormatters.bankedResetExpiryDayAndTime(expiry, now: boundary.addingTimeInterval(-1), calendar: calendar, locale: locale),
+      DisplayFormatters.bankedResetExpiryDayAndTime(expiry, now: boundary.addingTimeInterval(1), calendar: calendar, locale: locale)
     )
   }
 
-  func testBankedResetExpiryPresentationLocalizesMonthDayOrder() {
+  func testExpiryDateUsesCalendarTimezoneLocaleAndYear() {
     var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    let now = calendar.date(from: DateComponents(year: 2024, month: 7, day: 21))!
-    let expiry = calendar.date(byAdding: .day, value: 15, to: now)!
-
+    calendar.timeZone = TimeZone(secondsFromGMT: -5 * 3_600)!
+    let now = calendar.date(from: DateComponents(year: 2026, month: 12, day: 20))!
+    let expiry = calendar.date(from: DateComponents(year: 2027, month: 1, day: 5, hour: 23))!
+    let text = DisplayFormatters.bankedResetExpiryDayAndTime(
+      expiry, now: now, calendar: calendar, locale: Locale(identifier: "en_GB")
+    )
+    XCTAssertTrue(text.contains("Tue, 5 Jan 2027"))
+    XCTAssertTrue(text.hasSuffix("23:00"))
     XCTAssertTrue(DisplayFormatters.bankedResetExpiryDayAndTime(
-      expiry,
-      now: now,
-      calendar: calendar,
-      locale: Locale(identifier: "en_GB")
-    ).hasPrefix("on 05/08"))
+      expiry, now: calendar.date(byAdding: .day, value: -1, to: expiry)!,
+      calendar: calendar, locale: Locale(identifier: "en_GB")
+    ).hasPrefix("tomorrow at"))
+  }
+
+  func testExpiredAvailableRowsDoNotMaskFutureDeadlineOrChangeServerCount() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    let credits = RateLimitResetCredits(availableCount: 4, credits: [
+      resetCredit(id: "expired", expiresAt: now.addingTimeInterval(-60).timeIntervalSince1970),
+      resetCredit(id: "boundary", expiresAt: now.timeIntervalSince1970),
+      resetCredit(id: "future", expiresAt: now.addingTimeInterval(1_800).timeIntervalSince1970)
+    ])
+    let presentation = ResetCreditPresentation(resetCredits: credits, now: now)
+    XCTAssertEqual(presentation.countText, "4 banked resets available")
+    XCTAssertEqual(presentation.expiryAlert?.expiry, now.addingTimeInterval(1_800))
+    XCTAssertEqual(presentation.expiryAlert?.level, .critical)
+    XCTAssertNotNil(presentation.expiryText)
+    let later = ResetCreditPresentation(resetCredits: credits, now: now.addingTimeInterval(1_800))
+    XCTAssertNil(later.expiryText)
+    XCTAssertNil(later.expiryAlert)
+    XCTAssertEqual(later.countText, presentation.countText)
+  }
+
+  func testWeeklyResetAndExhaustedNotificationDoNotPromisePastDeadline() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    XCTAssertTrue(DisplayFormatters.weeklyResetText(now, now: now).hasPrefix("Reset was scheduled"))
+    XCTAssertTrue(DisplayFormatters.weeklyResetText(now.addingTimeInterval(60), now: now).hasPrefix("Resets"))
+    let stale = snapshot(remaining: 0, checkedAt: now.addingTimeInterval(-7_200), resetsAt: now.addingTimeInterval(-60))
+    XCTAssertEqual(LimitNotificationEvent.quotaExhausted.body(previous: snapshot(remaining: 4), current: stale, now: now),
+                   "The scheduled reset time has passed. Awaiting updated quota.")
+    let upcoming = snapshot(remaining: 0, checkedAt: now.addingTimeInterval(-7_200), resetsAt: now.addingTimeInterval(3_600))
+    XCTAssertEqual(LimitNotificationEvent.quotaExhausted.body(previous: snapshot(remaining: 4), current: upcoming, now: now),
+                   "Reset is in 1 hour.")
   }
 
   func testResetExpiryPolicyUsesOneDayWarningAndOneHourCriticalAlert() {
@@ -393,8 +391,10 @@ final class RateLimitTests: XCTestCase {
     let warning = ResetCreditExpiryAlert(level: .warning, expiry: expiry)
     let critical = ResetCreditExpiryAlert(level: .critical, expiry: expiry)
 
-    XCTAssertTrue(warning.body(availableCount: 5).contains("5 banked resets"))
-    XCTAssertTrue(critical.body(availableCount: 5).contains("avoid losing it"))
+    XCTAssertTrue(warning.body(availableCount: 5, now: expiry.addingTimeInterval(-60)).contains("5 banked resets"))
+    XCTAssertTrue(warning.body(availableCount: 1, now: expiry.addingTimeInterval(-60)).hasPrefix("Your banked reset expires "))
+    XCTAssertTrue(critical.body(availableCount: 5, now: expiry.addingTimeInterval(-60)).contains("avoid losing it"))
+    XCTAssertTrue(critical.body(availableCount: 5, now: expiry).contains("expiry time has passed"))
   }
 
   func testResetCreditPresentationExposesVisualAlertLevel() {
@@ -526,7 +526,7 @@ final class RateLimitTests: XCTestCase {
     XCTAssertEqual(LimitNotificationEvent.quotaIncreased.title, "Codex weekly quota increased")
     XCTAssertEqual(LimitNotificationEvent.lowQuota.body(previous: previous, current: snapshot(remaining: 18)), "Less than 20% remaining.")
     XCTAssertEqual(LimitNotificationEvent.redQuota.body(previous: previous, current: snapshot(remaining: 9)), "Less than 10% remaining.")
-    XCTAssertEqual(LimitNotificationEvent.quotaExhausted.body(previous: previous, current: current), "Reset is in 2 days 3 hours.")
+    XCTAssertEqual(LimitNotificationEvent.quotaExhausted.body(previous: previous, current: current, now: current.checkedAt), "Reset is in 2 days 3 hours.")
   }
 
   func testMenuBarPresentationBandsRemainingCapacity() {
@@ -890,14 +890,15 @@ final class RateLimitTests: XCTestCase {
 
   private func resetCredit(
     id: String,
-    status: String = "available"
+    status: String = "available",
+    expiresAt: TimeInterval = 10_000
   ) -> RateLimitResetCredit {
     RateLimitResetCredit(
       id: id,
       resetType: "codexRateLimits",
       status: status,
       grantedAt: 1_000,
-      expiresAt: 10_000,
+      expiresAt: expiresAt,
       title: nil,
       description: nil
     )

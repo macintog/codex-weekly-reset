@@ -18,7 +18,7 @@ final class UIConfigurationReliabilityTests: XCTestCase {
   }
 
   @MainActor
-  func testEmptyAlarmAndFailureGlyphsActuallyPaintRed() throws {
+  func testEmptyAlarmAndFailureGlyphsKeepNeutralOutlines() throws {
     _ = NSApplication.shared
     let exhausted = RateLimitSnapshot(
       limitId: "codex", limitName: nil, usedPercent: 100, remainingPercent: 0,
@@ -30,10 +30,12 @@ final class UIConfigurationReliabilityTests: XCTestCase {
       XCTAssertFalse(image.isTemplate)
       let data = try XCTUnwrap(image.tiffRepresentation)
       let bitmap = try XCTUnwrap(NSBitmapImageRep(data: data))
+      var visiblePixels = 0
       var redPixels = 0
       for y in 0..<bitmap.pixelsHigh {
         for x in 0..<bitmap.pixelsWide {
           guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+          if color.alphaComponent > 0.1 { visiblePixels += 1 }
           if color.alphaComponent > 0.1,
              color.redComponent > color.greenComponent + 0.2,
              color.redComponent > color.blueComponent + 0.2 {
@@ -41,7 +43,8 @@ final class UIConfigurationReliabilityTests: XCTestCase {
           }
         }
       }
-      XCTAssertGreaterThan(redPixels, 0, "An empty alarm glyph must still visibly carry red")
+      XCTAssertGreaterThan(visiblePixels, 0, "Empty outlines must remain visible")
+      XCTAssertEqual(redPixels, 0, "Empty outlines must remain neutral")
     }
   }
 

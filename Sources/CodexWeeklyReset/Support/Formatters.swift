@@ -15,32 +15,13 @@ enum DisplayFormatters {
     return formatter
   }()
 
-  static let resetDayAndTime: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "EEEE 'at' h:mm a"
-    return formatter
-  }()
-
-  static let resetTime: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "h:mm a"
-    return formatter
-  }()
-
-  static func alertResetDayAndTime(_ date: Date, now: Date = Date()) -> String {
-    let calendar = Calendar.current
-    let day: String
-
-    if calendar.isDate(date, inSameDayAs: now) {
-      day = "today"
-    } else if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
-              calendar.isDate(date, inSameDayAs: tomorrow) {
-      day = "tomorrow"
-    } else {
-      return resetDayAndTime.string(from: date)
-    }
-
-    return "\(day) at \(resetTime.string(from: date))"
+  static func alertResetDayAndTime(
+    _ date: Date,
+    now: Date = Date(),
+    calendar: Calendar = .autoupdatingCurrent,
+    locale: Locale = .autoupdatingCurrent
+  ) -> String {
+    bankedResetExpiryDayAndTime(date, now: now, calendar: calendar, locale: locale)
   }
 
   static func bankedResetExpiryDayAndTime(
@@ -49,21 +30,27 @@ enum DisplayFormatters {
     calendar: Calendar = .autoupdatingCurrent,
     locale: Locale = .autoupdatingCurrent
   ) -> String {
-    let weekday = localizedDatePart("EEEE", date: date, calendar: calendar, locale: locale)
     let time = localizedTime(date, calendar: calendar, locale: locale)
-
-    if let endOfFirstWeek = calendar.date(byAdding: .day, value: 7, to: now),
-       date <= endOfFirstWeek {
-      return "\(weekday) at \(time)"
+    let day: String
+    if calendar.isDate(date, inSameDayAs: now) {
+      day = "today"
+    } else if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
+              calendar.isDate(date, inSameDayAs: tomorrow) {
+      day = "tomorrow"
+    } else {
+      let sameYear = calendar.component(.era, from: date) == calendar.component(.era, from: now)
+        && calendar.component(.year, from: date) == calendar.component(.year, from: now)
+      day = localizedDatePart(
+        sameYear ? "EEEMMMd" : "yEEEMMMd",
+        date: date, calendar: calendar, locale: locale
+      )
     }
+    return "\(day) at \(time)"
+  }
 
-    if let endOfSecondWeek = calendar.date(byAdding: .day, value: 14, to: now),
-       date <= endOfSecondWeek {
-      return "next \(weekday) at \(time)"
-    }
-
-    let monthAndDay = localizedDatePart("Md", date: date, calendar: calendar, locale: locale)
-    return "on \(monthAndDay) at \(time)"
+  static func weeklyResetText(_ date: Date, now: Date = Date()) -> String {
+    let prefix = date > now ? "Resets " : "Reset was scheduled "
+    return prefix + alertResetDayAndTime(date, now: now)
   }
 
   private static func localizedDatePart(
