@@ -57,10 +57,13 @@ struct RateLimitResetCredits: Codable, Equatable, Sendable {
     credits = try container.decodeIfPresent([RateLimitResetCredit].self, forKey: .credits)
   }
 
-  var earliestAvailableExpiry: Date? {
+  // Keep the server's count intact, but do not let stale expired rows mask
+  // the next actionable deadline.
+  func earliestAvailableExpiry(after now: Date) -> Date? {
     credits?
       .filter(\.isAvailable)
       .compactMap(\.expiryDate)
+      .filter { $0 > now }
       .min()
   }
 

@@ -171,6 +171,45 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'operator-approved customer note'):
             self.capture()
 
+    def test_preflight_checks_notary_profile_tools_and_exact_sparkle_license(self):
+        license_path = self.root / 'Resources/ThirdPartyNotices/Sparkle-LICENSE.txt'
+        license_path.parent.mkdir(parents=True, exist_ok=True)
+        license_path.write_text('license\n')
+        resolved_license = self.base / 'resolved-license'
+        resolved_license.write_text('license\n')
+        for tool in self.tools.iterdir():
+            tool.chmod(0o755)
+        args = argparse.Namespace(
+            root=self.root, config=self.root / 'docs/release/targets.json',
+            sparkle_license=resolved_license, tools_dir=self.tools,
+            sparkle_account='test', notary_profile='test')
+        with patch.object(release, 'run', self.fake_run):
+            result = release.preflight(args)
+        self.assertTrue(result['ready'])
+        self.assertEqual(result['notary_profile'], 'verified')
+
+        resolved_license.write_text('wrong\n')
+        with self.assertRaisesRegex(ValueError, 'Sparkle notices differ'):
+            release.preflight(args)
+
+    def test_preflight_rejects_malformed_notary_history(self):
+        license_path = self.root / 'Resources/ThirdPartyNotices/Sparkle-LICENSE.txt'
+        license_path.parent.mkdir(parents=True, exist_ok=True)
+        license_path.write_text('license\n')
+        for tool in self.tools.iterdir():
+            tool.chmod(0o755)
+        args = argparse.Namespace(
+            root=self.root, config=self.root / 'docs/release/targets.json',
+            sparkle_license=license_path, tools_dir=self.tools,
+            sparkle_account='test', notary_profile='test')
+        def malformed(*command):
+            if str(command[0]).endswith('generate_keys'):
+                return 'test-public-key\n'
+            return '{}'
+        with patch.object(release, 'run', malformed):
+            with self.assertRaisesRegex(ValueError, 'unsupported history'):
+                release.preflight(args)
+
     def test_final_review_requires_exact_functional_smoke_evidence(self):
         self.make_ready()
         with self.assertRaisesRegex(ValueError, 'functional smoke'):
@@ -425,13 +464,14 @@ class ReleaseTests(unittest.TestCase):
             release.plan(self.rd)
 
     def test_refresh_source_replaces_only_release_tooling_and_preserves_notarization(self):
-        before = self.reopen_as_stapled()
+        self.make_smoke_ready()
+        before = release.load(self.rd)
         (self.root / 'script/release_feed.py').write_text('corrected feed tooling\n')
         root_page = (self.root / 'website/index.html').read_bytes()
         result = release.refresh_source(argparse.Namespace(
             release_dir=self.rd, root=self.root, resume=False))
 
-        self.assertEqual(result['state'], 'stapled')
+        self.assertEqual(result['state'], 'ready')
         after = release.load(self.rd)
         for key in ('notary_submission', 'notary_archive', 'notary_sha256', 'tool_hashes',
                     'signed_files', 'stapled_files', 'tested_files', 'editorial_files',
@@ -442,12 +482,14 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn('Version 0.1.6', (self.rd / 'public/website/index.html').read_text())
         self.assertEqual((self.rd / 'public/script/release_feed.py').read_text(),
                          'corrected feed tooling\n')
-        self.assertFalse((self.rd / 'prepared-website').exists())
-        self.assertFalse((self.rd / 'publication').exists())
-        self.assertFalse((self.rd / 'functional-smoke.json').exists())
-        self.assertNotIn('prepared_files', after)
-        self.assertNotIn('publication_files', after)
-        self.assertNotIn('functional_smoke', after)
+        self.assertTrue((self.rd / 'prepared-website').exists())
+        self.assertTrue((self.rd / 'publication').exists())
+        self.assertTrue((self.rd / 'functional-smoke.json').exists())
+        self.assertEqual(after['prepared_files'], before['prepared_files'])
+        self.assertEqual(after['functional_smoke'], before['functional_smoke'])
+        self.assertTrue(release.smoke_is_valid(self.rd, after))
+        self.assertEqual((self.rd / 'publication/script/release_feed.py').read_text(),
+                         'corrected feed tooling\n')
         self.assertEqual(after['source_refresh']['changed_paths'], ['script/release_feed.py'])
         self.assertRegex(after['source_refresh']['prior_public_manifest_sha256'], r'^[0-9a-f]{64}$')
         self.assertRegex(after['source_refresh']['new_public_manifest_sha256'], r'^[0-9a-f]{64}$')
@@ -495,14 +537,14 @@ class ReleaseTests(unittest.TestCase):
         result = release.refresh_source(argparse.Namespace(
             release_dir=self.rd, root=self.root, resume=False))
 
-        self.assertEqual(result['state'], 'stapled')
+        self.assertEqual(result['state'], 'ready')
         after = release.load(self.rd)
         self.assertEqual((self.rd / 'public/SECURITY.md').read_bytes(), policy)
         self.assertEqual(after['source_refresh']['changed_paths'], ['SECURITY.md'])
         for key in ('notary_submission', 'notary_archive', 'notary_sha256', 'tool_hashes',
                     'signed_files', 'stapled_files'):
             self.assertEqual(after[key], before[key], key)
-        self.assertFalse((self.rd / 'publication').exists())
+        self.assertTrue((self.rd / 'publication').exists())
         self.assertEqual(self.submissions, 1)
 
     def test_refresh_source_validates_ready_publication_before_replacement(self):
@@ -512,16 +554,24 @@ class ReleaseTests(unittest.TestCase):
             release.refresh_source(argparse.Namespace(
                 release_dir=self.rd, root=self.root, resume=False))
 
-    def test_refresh_source_rejects_approval_and_nonstapled_receipts(self):
-        self.reopen_as_stapled()
-        receipt = release.load(self.rd)
-        receipt['approval'] = {'manifest': 'approved'}
-        release.write_json(self.rd / 'receipt.json', receipt)
-        with self.assertRaisesRegex(ValueError, 'approval'):
+    def test_refresh_source_validates_prepared_website_before_reuse(self):
+        self.make_ready()
+        (self.rd / 'prepared-website/appcast.xml').write_text('changed after preparation\n')
+        with self.assertRaisesRegex(ValueError, 'Prepared website bytes changed'):
             release.refresh_source(argparse.Namespace(
                 release_dir=self.rd, root=self.root, resume=False))
 
-        receipt.pop('approval')
+    def test_refresh_source_rejects_approval_and_nonstapled_receipts(self):
+        self.make_smoke_ready()
+        review_args = argparse.Namespace(release_dir=self.rd)
+        digest = release.review(review_args)['review_sha256']
+        release.approve(argparse.Namespace(release_dir=self.rd, review_sha256=digest))
+        (self.root / 'script/release_feed.py').write_text('approved source correction\n')
+        with self.assertRaisesRegex(ValueError, 'blocked after final release approval'):
+            release.refresh_source(argparse.Namespace(
+                release_dir=self.rd, root=self.root, resume=False))
+
+        receipt = release.load(self.rd)
         receipt['state'] = 'finalized'
         release.write_json(self.rd / 'receipt.json', receipt)
         with self.assertRaisesRegex(ValueError, 'stapled or ready'):

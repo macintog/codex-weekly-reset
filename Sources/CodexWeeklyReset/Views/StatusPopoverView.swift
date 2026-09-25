@@ -40,7 +40,7 @@ struct StatusPopoverView: View {
       .padding(.trailing, 18)
     }
     .frame(width: 386)
-    .background(PopoverWindowReader())
+    .modifier(PopoverContentMeasurement())
   }
 
   @ViewBuilder
@@ -94,7 +94,9 @@ struct StatusPopoverView: View {
 
   private var statusItems: some View {
     VStack(alignment: .leading, spacing: 0) {
-      quotaStatusItems
+      TimelineView(.periodic(from: .now, by: 30)) { context in
+        quotaStatusItems(now: context.date)
+      }
 
       Divider()
         .padding(.leading, 37)
@@ -115,13 +117,14 @@ struct StatusPopoverView: View {
     }
   }
 
-  private var quotaStatusItems: some View {
+  private func quotaStatusItems(now: Date) -> some View {
     VStack(alignment: .leading, spacing: 11) {
       statusItem(
         symbol: "calendar",
         tint: .green,
-        title: resetText,
+        title: resetText(now: now),
         id: "resetTimeValue",
+        lineLimit: 2,
         fontSize: 17,
         fontWeight: .medium
       )
@@ -130,7 +133,7 @@ struct StatusPopoverView: View {
          let resetCredits = snapshot.resetCredits {
         let presentation = ResetCreditPresentation(
           resetCredits: resetCredits,
-          now: snapshot.checkedAt
+          now: now
         )
         statusItem(
           symbol: "ticket",
@@ -149,6 +152,7 @@ struct StatusPopoverView: View {
             title: expiryText,
             id: "resetCreditExpiryValue",
             minimumScaleFactor: 0.9,
+            lineLimit: 2,
             textColor: alertLevel == nil ? .primary : tint,
             fontSize: 17,
             fontWeight: alertLevel == nil ? .medium : .semibold
@@ -253,6 +257,7 @@ struct StatusPopoverView: View {
     id: String,
     accessibilityValue: String? = nil,
     minimumScaleFactor: CGFloat = 1,
+    lineLimit: Int = 1,
     textColor: Color = .primary,
     fontSize: CGFloat = 18,
     fontWeight: Font.Weight = .regular
@@ -266,7 +271,8 @@ struct StatusPopoverView: View {
       Text(title)
         .font(.system(size: fontSize, weight: fontWeight, design: .rounded))
         .foregroundStyle(textColor)
-        .lineLimit(1)
+        .lineLimit(lineLimit)
+        .fixedSize(horizontal: false, vertical: lineLimit > 1)
         .allowsTightening(minimumScaleFactor < 1)
         .minimumScaleFactor(minimumScaleFactor)
         .truncationMode(.middle)
@@ -311,11 +317,11 @@ struct StatusPopoverView: View {
     }
   }
 
-  private var resetText: String {
+  private func resetText(now: Date) -> String {
     guard let snapshot = monitor.state.snapshot else {
       return "--"
     }
-    return "Resets \(DisplayFormatters.resetDayAndTime.string(from: snapshot.resetsAt))"
+    return DisplayFormatters.weeklyResetText(snapshot.resetsAt, now: now)
   }
 
   private var lastCheckText: String {
@@ -334,6 +340,21 @@ struct StatusPopoverView: View {
   }
 }
 
+struct PopoverContentMeasurement: ViewModifier {
+  func body(content: Content) -> some View {
+    // Feed the reader directly from the padded content's ideal-height geometry.
+    // Do not round-trip through root @State/preferences: the native menu-bar
+    // host can retain the reader without propagating that state update to it.
+    content
+      .fixedSize(horizontal: false, vertical: true)
+      .background {
+        GeometryReader { geometry in
+          PopoverWindowReader(contentSize: geometry.size)
+        }
+      }
+  }
+}
+
 struct ResetCreditPresentation: Equatable {
   let countText: String
   let expiryText: String?
@@ -348,10 +369,8 @@ struct ResetCreditPresentation: Equatable {
       now: now
     )
 
-    if let expiry = resetCredits.earliestAvailableExpiry {
-      let formattedExpiry = expiryAlert == nil
-        ? DisplayFormatters.bankedResetExpiryDayAndTime(expiry, now: now)
-        : DisplayFormatters.alertResetDayAndTime(expiry, now: now)
+    if let expiry = resetCredits.earliestAvailableExpiry(after: now) {
+      let formattedExpiry = DisplayFormatters.bankedResetExpiryDayAndTime(expiry, now: now)
       expiryText = "Next reset expires " + formattedExpiry
     } else {
       expiryText = nil

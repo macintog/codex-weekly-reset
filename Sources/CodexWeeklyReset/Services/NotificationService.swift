@@ -58,9 +58,11 @@ final class SystemNotificationService: NSObject, UserNotificationManaging {
 
   func notify(_ alert: ResetCreditExpiryAlert, availableCount: Int) async throws {
     try await requireAuthorization()
+    let now = Date()
+    guard alert.expiry > now else { return }
 
     let content = UNMutableNotificationContent()
-    content.body = alert.body(availableCount: availableCount)
+    content.body = alert.body(availableCount: availableCount, now: now)
     content.sound = .default
 
     let request = UNNotificationRequest(

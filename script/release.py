@@ -178,6 +178,42 @@ def validate_targets(config):
         raise ValueError("Explain the disabled announcement destination in the review packet")
 
 
+def preflight(args):
+    """Validate release dependencies before emitting a versioned candidate."""
+    root = args.root.resolve(strict=True)
+    config = json.loads(args.config.read_text())
+    validate_targets(config)
+
+    required = [root / name for name in PUBLIC_PATHS if name not in OPTIONAL_PUBLIC_PATHS]
+    missing = [path.relative_to(root).as_posix() for path in required if not path.exists()]
+    if missing:
+        raise ValueError(f"Required public inputs missing: {', '.join(missing)}")
+
+    bundled_notice = root / "Resources/ThirdPartyNotices/Sparkle-LICENSE.txt"
+    resolved_notice = args.sparkle_license.resolve()
+    if not bundled_notice.is_file() or not resolved_notice.is_file():
+        raise ValueError("Sparkle license preflight requires both the bundled notice and resolved dependency license")
+    if bundled_notice.read_bytes() != resolved_notice.read_bytes():
+        raise ValueError("Sparkle notices differ from the resolved dependency license")
+
+    tools_dir = args.tools_dir.resolve()
+    tool_names = ("generate_appcast", "generate_keys", "sign_update")
+    unavailable = [name for name in tool_names
+                   if not (tools_dir / name).is_file() or not os.access(tools_dir / name, os.X_OK)]
+    if unavailable:
+        raise ValueError(f"Sparkle release tools are unavailable: {', '.join(unavailable)}")
+    public_key = run(tools_dir / "generate_keys", "--account", args.sparkle_account, "-p").strip()
+    if not public_key:
+        raise ValueError("Sparkle signing account returned no public key")
+
+    history = json.loads(run("xcrun", "notarytool", "history", "--keychain-profile",
+                             args.notary_profile, "--output-format", "json"))
+    entries = history.get("history", history.get("submissions"))
+    if not isinstance(entries, list):
+        raise ValueError("Notary profile returned an unsupported history response")
+    return {"ready": True, "public_inputs": len(public_input_files(root)),
+            "sparkle_tools": len(tool_names), "notary_profile": "verified",
+            "github_repository": config["github_repository"]}
 def render_note_review(notes, version, summary):
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ValueError("Release version must be x.y.z")
@@ -662,7 +698,7 @@ def verify_live(args):
     if failures:
         raise ValueError(json.dumps({"pending_or_failed": failures}))
     return {"verified_urls": len(urls), "build": receipt["identity"]["build"],
-            "remaining": "Prove source, Pages and tag refs on GitHub and public Gitea through the publication lane."}
+            "remaining": "Prove source, Pages, tag and Release refs on GitHub through the publication lane."}
 
 
 
@@ -823,15 +859,20 @@ def finish_revision(release_dir, expected_operation=None):
         raise ValueError("Invalid revision staging identity")
     staging = release_dir / journal["staging"]
     receipt = journal["receipt"]
-    for name in ("public", "editorial"):
-        if files(staging / name) != receipt[name + "_files"]:
+    replacements = journal.get("replace", ["public", "editorial"])
+    allowed_replacements = {"public": "public_files", "editorial": "editorial_files",
+                            "publication": "publication_files"}
+    if any(name not in allowed_replacements for name in replacements):
+        raise ValueError("Revision journal contains an unsafe replacement target")
+    for name in replacements:
+        if files(staging / name) != receipt[allowed_replacements[name]]:
             raise ValueError("Revision staging changed; retain the journal for inspection")
     removable = {"prepared-website", "publication", "functional-smoke.json", "REVIEW.md"}
     if any(name not in removable for name in journal.get("remove", [])):
         raise ValueError("Revision journal contains an unsafe removal target")
     # The journal owns these generated snapshot directories and keeps pristine
     # replacement copies until the new receipt is durably recorded.
-    for name in ("public", "editorial"):
+    for name in replacements:
         target = release_dir / name
         if target.exists():
             shutil.rmtree(target)
@@ -891,13 +932,15 @@ def refresh_source(args):
         else:
             receipt = load(release_dir)
             check_inputs(release_dir, receipt)
-            if receipt["state"] == "ready":
+            was_ready = receipt["state"] == "ready"
+            if was_ready:
                 receipt = ready(release_dir)
+                if files(release_dir / "prepared-website") != receipt["prepared_files"]:
+                    raise ValueError("Prepared website bytes changed after preparation")
             elif receipt["state"] != "stapled":
                 raise ValueError("Source refresh requires a stapled or ready release")
             if "approval" in receipt:
                 raise ValueError("Source refresh is blocked after final release approval")
-
             app = release_dir / "signed" / APP_NAME
             if (files(app) != receipt["stapled_files"] or identity(app) != receipt["identity"] or
                     sha(release_dir / receipt["notary_archive"]) != receipt["notary_sha256"]):
@@ -954,20 +997,36 @@ def refresh_source(args):
                     raise ValueError("Source refresh may change release tooling or optional public policy files only")
 
                 revised = dict(receipt)
-                revised["state"] = "stapled"
                 revised["public_files"] = new_public_files
                 revised["source_refresh"] = {
                     "prior_public_manifest_sha256": manifest_sha256(receipt["public_files"]),
                     "new_public_manifest_sha256": manifest_sha256(new_public_files),
                     "changed_paths": changed_paths,
                 }
-                for key in ("prepared_files", "publication_files", "functional_smoke"):
-                    revised.pop(key, None)
+                replace = ["public", "editorial"]
+                remove = ["REVIEW.md"]
+                if was_ready:
+                    shutil.copytree(temporary / "public", temporary / "publication")
+                    shutil.rmtree(temporary / "publication/website")
+                    shutil.copytree(release_dir / "prepared-website",
+                                    temporary / "publication/website")
+                    revised["state"] = "ready"
+                    revised["publication_files"] = files(temporary / "publication")
+                    replace.append("publication")
+                    # Exact artifact smoke remains valid because the prepared website and ZIP
+                    # are unchanged. The new publication manifest still invalidates approval.
+                    revised.pop("approval", None)
+                else:
+                    revised["state"] = "stapled"
+                    for key in ("prepared_files", "publication_files", "functional_smoke"):
+                        revised.pop(key, None)
+                    remove = ["prepared-website", "publication", "functional-smoke.json", "REVIEW.md"]
                 write_json(release_dir / "pending-revision.json", {
                     "operation": "refresh-source",
                     "staging": temporary.name,
                     "receipt": revised,
-                    "remove": ["prepared-website", "publication", "functional-smoke.json", "REVIEW.md"],
+                    "replace": replace,
+                    "remove": remove,
                 })
             except BaseException:
                 if not (release_dir / "pending-revision.json").exists():
@@ -996,6 +1055,13 @@ def main():
     approve_note_parser = sub.add_parser("approve-note", help="Record explicit approval of the pre-build customer note")
     approve_note_parser.add_argument("--review-dir", type=Path, required=True)
     approve_note_parser.add_argument("--review-sha256", required=True)
+    preflight_parser = sub.add_parser("preflight", help="Check release dependencies before building a versioned candidate")
+    preflight_parser.add_argument("--root", type=Path, default=ROOT)
+    preflight_parser.add_argument("--config", type=Path, default=ROOT / "docs/release/targets.json")
+    preflight_parser.add_argument("--notary-profile", required=True)
+    preflight_parser.add_argument("--tools-dir", type=Path, required=True)
+    preflight_parser.add_argument("--sparkle-license", type=Path, required=True)
+    preflight_parser.add_argument("--sparkle-account", default="ed25519")
     for name in ("prepare", "status", "plan", "record-smoke", "verify-live", "verify-copy", "attach-notary", "review", "approve", "verify-text", "revise-text", "refresh-source", "retry-upload", "verify-headlines"):
         command = sub.add_parser(name)
         command.add_argument("--release-dir", type=Path, required=True)
@@ -1035,7 +1101,7 @@ def main():
         if args.command in ("status", "plan"):
             result = {"status": status, "plan": plan}[args.command](args.release_dir)
         else:
-            result = {"review-note": review_note, "approve-note": approve_note,
+            result = {"preflight": preflight, "review-note": review_note, "approve-note": approve_note,
                       "capture": capture, "prepare": prepare, "record-smoke": record_smoke, "verify-live": verify_live,
                       "verify-copy": verify_copy, "attach-notary": attach_notary,
                       "review": review, "approve": approve, "verify-text": verify_text, "revise-text": revise_text,

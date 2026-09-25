@@ -61,7 +61,7 @@ enum LimitNotificationEvent: String, Equatable, Sendable {
     }
   }
 
-  func body(previous: RateLimitSnapshot, current: RateLimitSnapshot) -> String {
+  func body(previous: RateLimitSnapshot, current: RateLimitSnapshot, now: Date = Date()) -> String {
     let remaining = DisplayFormatters.percentage(current.remainingPercent)
 
     switch self {
@@ -70,7 +70,10 @@ enum LimitNotificationEvent: String, Equatable, Sendable {
     case .redQuota:
       return "Less than 10% remaining."
     case .quotaExhausted:
-      return "Reset is in \(resetDurationText(from: current.checkedAt, to: current.resetsAt))."
+      guard current.resetsAt > now else {
+        return "The scheduled reset time has passed. Awaiting updated quota."
+      }
+      return "Reset is in \(resetDurationText(from: now, to: current.resetsAt))."
     case .quotaIncreased:
       return "Weekly remaining is now \(remaining)."
     }
@@ -192,12 +195,17 @@ struct ResetCreditExpiryAlert: Equatable, Hashable, Sendable {
   }
 
   func body(availableCount: Int, now: Date = Date()) -> String {
+    guard expiry > now else {
+      return "The banked reset expiry time has passed. Refresh to check available resets."
+    }
     let expiryText = DisplayFormatters.alertResetDayAndTime(expiry, now: now)
 
     switch level {
     case .warning:
-      let noun = availableCount == 1 ? "reset" : "resets"
-      return "One of your \(availableCount) banked \(noun) expires \(expiryText)."
+      if availableCount == 1 {
+        return "Your banked reset expires \(expiryText)."
+      }
+      return "One of your \(availableCount) banked resets expires \(expiryText)."
     case .critical:
       return "Use the reset before \(expiryText) to avoid losing it."
     }
@@ -212,7 +220,7 @@ enum ResetCreditExpiryPolicy {
     resetCredits: RateLimitResetCredits?,
     now: Date
   ) -> ResetCreditExpiryAlert? {
-    guard let expiry = resetCredits?.earliestAvailableExpiry else {
+    guard let expiry = resetCredits?.earliestAvailableExpiry(after: now) else {
       return nil
     }
 

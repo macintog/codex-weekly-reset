@@ -16,13 +16,13 @@ This is an independent utility. It is not affiliated with, endorsed by, or suppo
 
 ## Download
 
-[**Download Codex Weekly Reset 0.1.6**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
+[**Download Codex Weekly Reset 0.1.7**](https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset.zip)
 
-Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.6 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.6).
+Requires macOS 14 or later. The release app is Developer ID signed, Apple-notarized, and stapled. See the [0.1.7 release notes](https://github.com/macintog/codex-weekly-reset/releases/tag/v0.1.7).
 
 ## What’s New
 
-- **0.1.6:** More reliable Codex usage updates and menu bar behavior.
+- **0.1.7:** See clear reset dates, neutral empty icon outlines, and a menu bar window that fits its contents.
 
 ## Run
 
