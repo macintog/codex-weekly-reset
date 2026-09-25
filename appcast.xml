@@ -6,6 +6,28 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Codex Weekly Reset</title>
         <item>
+            <title>0.1.7</title>
+            <pubDate>Thu, 24 Sep 2026 20:20:49 -0400</pubDate>
+            <link>https://macintog.github.io/codex-weekly-reset/</link>
+            <sparkle:version>142</sparkle:version>
+            <sparkle:shortVersionString>0.1.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description><![CDATA[<h1>Codex Weekly Reset 0.1.7</h1>
+<ul>
+  <li><strong>0.1.7:</strong> See clear reset dates, neutral empty icon outlines, and a menu bar window that fits its contents.</li>
+</ul>
+]]></description>
+            <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset-v0.1.7-b142.zip" length="3584032" type="application/octet-stream" sparkle:edSignature="a4VvIh5BuzUuAVx+1bPIgYMQSh2mszn9BRXyD7hxS1O3edC0CCthJMAtgE+gpW6jm1ChlB/zBIB70u+AGVHQAg=="/>
+            <sparkle:deltas>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-136.delta" sparkle:deltaFrom="136" length="164578" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="6b51r258aR93Sh10vuqXhAeCKfbKKM9p7NA+6jCm/qjcHKwni6DXEoXnhUeMt5KyQ+n2xE7eehb2D6M6KEKhBQ=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-130.delta" sparkle:deltaFrom="130" length="224182" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="a4CKxKTbMfuEq8dOsIqLrgflqKcYeZp9R7ZmuWSeEOct67o/YNMc+dWxF0qep4nhsOX7YqsVKABjPZgqc5nCBA=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-128.delta" sparkle:deltaFrom="128" length="229322" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Gg+oui7jMCPXwlCpckg7hfuj/qjNug7BUiOm+RLxFU0nKJljVvq/zQOZwIetlvwp1zyl+E1PK8Z0UAB+kQDkCg=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-126.delta" sparkle:deltaFrom="126" length="233042" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ZGTcZXJsk8dmquIF7NulLAW00f22q5sqsELOWdUzfA5axD1P3fYiwJitIoSIUJJfSvQ0ZZg0kHga3tfD+cXzCw=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-123.delta" sparkle:deltaFrom="123" length="232158" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="jFH/H49i1ALM2q4mdjiHXX7rcDp/o8mNfXT35ns4CiwjCj9sEaJGkua0cyflUS1UNyFL0oE0WAWKqZHK3XkBDA=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>0.1.6</title>
             <pubDate>Sat, 05 Sep 2026 14:52:49 -0400</pubDate>
             <link>https://macintog.github.io/codex-weekly-reset/</link>
@@ -48,24 +70,9 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
                 <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset130-122.delta" sparkle:deltaFrom="122" length="1604246" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="xI6/eeqIGlwR5E9l+sH/SlJfAyrNM+evmjTbixS4Cja+e0McHcmuYsDQXu+kOhQjKPN7IuLJUMCoNbfv4wkcBA=="/>
             </sparkle:deltas>
         </item>
-        <item>
-            <title>0.1.4</title>
-            <pubDate>Tue, 21 Jul 2026 19:48:41 -0400</pubDate>
-            <link>https://macintog.github.io/codex-weekly-reset/</link>
-            <sparkle:version>128</sparkle:version>
-            <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset-v0.1.4-b128.zip" length="3499081" type="application/octet-stream" sparkle:edSignature="S/W25DaapQVLlpjCd1RCmTbL8OMwDv5r1B+YwyTmO1wKlqbcUA5NfkymVt2H+2ofNywz8Q1fhZqMXqLgK9VmCA=="/>
-            <sparkle:deltas>
-                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset128-126.delta" sparkle:deltaFrom="126" length="61378" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="pTnX8KCKxMN0XL7DYoi4oT57l0RcFP+OlAbTehO3eFNqqd9bMXqacc2/XpE+zgR/of09Ced8XxtSl8SmG123Ag=="/>
-                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset128-123.delta" sparkle:deltaFrom="123" length="77226" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="MxH12tTuwEzm1PD7c5RaPk1pupVn25f1hSkMVkeJ7m1VOpqvAGMeWH/hXQsDQx6LZfBDcml0t+dzv6qpG9LJDQ=="/>
-                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset128-122.delta" sparkle:deltaFrom="122" length="1583770" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="RSNX5X5c6S8rxMGwhfFSxVYYap0wSWLXP+ec5vZEAuvU7WjAWLRkM5HSFhGwV351wjXyS4Jp9KuGn+a7U45hAQ=="/>
-            </sparkle:deltas>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: rz3WScLQBHdh7J6DMwu9Aps7ckgR/eKBq0bUfTMKET5BN1xzAbX38tgAeod/j1+w2EKt04CFrBQ5HK3PSKKXDQ==
-length: 8234
+edSignature: LnPfquCv09XQc+7POb3YPdkj000yvO86EtfjJ3Tzz9pVcWUxN+okSLeX0uJAkJcrhOW+smxyxvHpazQ3OeXeBA==
+length: 9291
 -->
