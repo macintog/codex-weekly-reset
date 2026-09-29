@@ -10,7 +10,8 @@ final class ResolverAndFixtureTests: XCTestCase {
       fileIsExecutable: { $0 == "/Users/test/bin/codex" || $0 == "/opt/homebrew/bin/codex" },
       homeDirectory: URL(fileURLWithPath: "/Users/test"),
       includeFallbacks: true,
-      launchServicesAppURLProvider: { nil }
+      launchServicesAppURLProvider: { _ in nil },
+      runningApplicationURLsProvider: { [] }
     )
 
     let result = await resolver.resolve()
@@ -20,23 +21,72 @@ final class ResolverAndFixtureTests: XCTestCase {
     )
   }
 
-  func testResolverFallsBackToApplicationsBeforeLaunchServices() async {
+  func testResolverPrefersCurrentApplicationBundleLayoutOverPathShim() async {
     let resolver = CodexExecutableResolver(
       configuredPath: nil,
-      commandPathProvider: { nil },
+      commandPathProvider: { "/Users/test/.local/bin/codex" },
       fileIsExecutable: { path in
-        path == "/Applications/Codex.app/Contents/Resources/codex"
-          || path == "/Resolved/Codex.app/Contents/Resources/codex"
+        path == "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
+          || path == "/Users/test/.local/bin/codex"
       },
       homeDirectory: URL(fileURLWithPath: "/Users/test"),
       includeFallbacks: true,
-      launchServicesAppURLProvider: { URL(fileURLWithPath: "/Resolved/Codex.app") }
+      launchServicesAppURLProvider: { _ in nil },
+      runningApplicationURLsProvider: { [] }
     )
 
     let result = await resolver.resolve()
     XCTAssertEqual(
       result,
-      CodexExecutable(path: "/Applications/Codex.app/Contents/Resources/codex", source: "/Applications")
+      CodexExecutable(
+        path: "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+        source: "/Applications"
+      )
+    )
+  }
+
+  func testResolverSupportsLegacyLaunchServicesBundleLayout() async {
+    let resolver = CodexExecutableResolver(
+      configuredPath: nil,
+      commandPathProvider: { nil },
+      fileIsExecutable: { $0 == "/Resolved/Codex.app/Contents/Resources/codex" },
+      homeDirectory: URL(fileURLWithPath: "/Users/test"),
+      includeFallbacks: true,
+      launchServicesAppURLProvider: { identifier in
+        XCTAssertEqual(identifier, "com.openai.codex")
+        return URL(fileURLWithPath: "/Resolved/Codex.app")
+      },
+      runningApplicationURLsProvider: { [] }
+    )
+
+    let result = await resolver.resolve()
+    XCTAssertEqual(
+      result,
+      CodexExecutable(path: "/Resolved/Codex.app/Contents/Resources/codex", source: "LaunchServices")
+    )
+  }
+
+  func testResolverFindsRunningChatGPTAppOutsideKnownApplicationFolders() async {
+    let resolver = CodexExecutableResolver(
+      commandPathProvider: { "/Users/test/.local/bin/codex" },
+      fileIsExecutable: { path in
+        path == "/Volumes/Tools/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
+          || path == "/Users/test/.local/bin/codex"
+      },
+      homeDirectory: URL(fileURLWithPath: "/Users/test"),
+      launchServicesAppURLProvider: { _ in nil },
+      runningApplicationURLsProvider: {
+        [URL(fileURLWithPath: "/Volumes/Tools/ChatGPT.app")]
+      }
+    )
+
+    let result = await resolver.resolve()
+    XCTAssertEqual(
+      result,
+      CodexExecutable(
+        path: "/Volumes/Tools/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+        source: "LaunchServices"
+      )
     )
   }
 
@@ -63,7 +113,8 @@ final class ResolverAndFixtureTests: XCTestCase {
       fileIsExecutable: { $0 == "/opt/homebrew/bin/codex" },
       homeDirectory: URL(fileURLWithPath: "/Users/test"),
       includeFallbacks: false,
-      launchServicesAppURLProvider: { URL(fileURLWithPath: "/Applications/Codex.app") }
+      launchServicesAppURLProvider: { _ in URL(fileURLWithPath: "/Applications/Codex.app") },
+      runningApplicationURLsProvider: { [] }
     )
 
     let result = await resolver.resolve()

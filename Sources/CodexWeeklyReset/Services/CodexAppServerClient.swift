@@ -17,6 +17,9 @@ actor CodexAppServerClient {
   private var updateHandler: ((RateLimitUpdate) -> Void)?
   private var stdoutBuffer = Data()
   private var stderrTail = Data()
+  private var terminationDrainTask: Task<Void, Never>?
+  private var stderrDidClose = false
+  private var processExitStatus: Int32?
   private let maxStderrTailBytes = 8 * 1024
 
   init(executablePath: String, requestTimeout: TimeInterval = 8) {
@@ -59,6 +62,8 @@ actor CodexAppServerClient {
     self.stderrHandle = stderr.fileHandleForReading
     self.stdoutBuffer.removeAll(keepingCapacity: true)
     self.stderrTail.removeAll(keepingCapacity: true)
+    self.stderrDidClose = false
+    self.processExitStatus = nil
     installReadabilityHandlers(
       stdout: stdout.fileHandleForReading,
       stderr: stderr.fileHandleForReading
@@ -85,6 +90,8 @@ actor CodexAppServerClient {
   }
 
   func stop() {
+    terminationDrainTask?.cancel()
+    terminationDrainTask = nil
     stdoutHandle?.readabilityHandler = nil
     stderrHandle?.readabilityHandler = nil
     inputHandle?.closeFile()
@@ -170,6 +177,9 @@ actor CodexAppServerClient {
   private func installReadabilityHandlers(stdout: FileHandle, stderr: FileHandle) {
     stdout.readabilityHandler = { [weak self] handle in
       let data = handle.availableData
+      if data.isEmpty {
+        handle.readabilityHandler = nil
+      }
       Task {
         await self?.consumeStdout(data)
       }
@@ -177,6 +187,9 @@ actor CodexAppServerClient {
 
     stderr.readabilityHandler = { [weak self] handle in
       let data = handle.availableData
+      if data.isEmpty {
+        handle.readabilityHandler = nil
+      }
       Task {
         await self?.consumeStderr(data)
       }
@@ -186,7 +199,6 @@ actor CodexAppServerClient {
   private func consumeStdout(_ data: Data) {
     guard !data.isEmpty else {
       logger.error("Codex app-server stdout closed")
-      failPending(CodexAppServerError.outputClosed)
       return
     }
 
@@ -203,6 +215,8 @@ actor CodexAppServerClient {
 
   private func consumeStderr(_ data: Data) {
     guard !data.isEmpty else {
+      stderrDidClose = true
+      finishExitedProcessIfReady()
       return
     }
 
@@ -219,8 +233,31 @@ actor CodexAppServerClient {
   }
 
   private func processDidExit(status: Int32) {
-    let stderr = String(data: stderrTail, encoding: .utf8)
+    processExitStatus = status
     logger.error("Codex app-server exited with status \(status, privacy: .public)")
+    finishExitedProcessIfReady()
+    guard processExitStatus != nil, terminationDrainTask == nil else { return }
+    terminationDrainTask = Task { [weak self] in
+      // FileHandle normally delivers stderr EOF after the final bytes. Keep a
+      // bounded fallback for a missing EOF callback, but never let stdout EOF
+      // outrun the real process status or the stderr drain.
+      try? await Task.sleep(nanoseconds: 1_000_000_000)
+      guard !Task.isCancelled else { return }
+      await self?.finishExitedProcessAfterDrainDeadline()
+    }
+  }
+
+  private func finishExitedProcessIfReady() {
+    guard stderrDidClose else { return }
+    finishExitedProcessAfterDrainDeadline()
+  }
+
+  private func finishExitedProcessAfterDrainDeadline() {
+    guard let status = processExitStatus else { return }
+    terminationDrainTask?.cancel()
+    terminationDrainTask = nil
+    processExitStatus = nil
+    let stderr = String(data: stderrTail, encoding: .utf8)
     failPending(CodexAppServerError.processExited(status, stderr: stderr))
   }
 

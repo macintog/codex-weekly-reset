@@ -45,6 +45,41 @@ final class ServiceReliabilityTests: XCTestCase {
     XCTAssertNil(closed)
   }
 
+  func testStdoutEOFWaitsForDelayedExitStatusAndStderr() async throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let executable = directory.appendingPathComponent("delayed-exit-app-server")
+    let script = """
+    #!/usr/bin/env python3
+    import os
+    import sys
+    import time
+
+    sys.stdin.readline()
+    os.close(1)
+    time.sleep(0.25)
+    print("delayed diagnostic", file=sys.stderr, flush=True)
+    time.sleep(0.10)
+    raise SystemExit(64)
+    """
+    try script.write(to: executable, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+
+    let client = CodexAppServerClient(executablePath: executable.path, requestTimeout: 2)
+    do {
+      _ = try await client.readRateLimits()
+      XCTFail("Expected the delayed app-server exit to fail the request")
+    } catch {
+      XCTAssertEqual(
+        error.localizedDescription,
+        "Codex app-server exited with status 64: delayed diagnostic"
+      )
+    }
+    await client.stop()
+  }
+
   func testSparseUpdateDecodesNullableAndMissingWindowMetadata() throws {
     let json = #"{"method":"account/rateLimits/updated","params":{"rateLimits":{"limitId":null,"primary":{"usedPercent":40,"resetsAt":null,"windowDurationMins":null}}}}"#
     let notification = try JSONDecoder().decode(RateLimitUpdateNotification.self, from: Data(json.utf8))
@@ -110,7 +145,8 @@ final class ServiceReliabilityTests: XCTestCase {
           await counter.begin()
           return nil
         },
-        fileIsExecutable: { _ in false }, launchServicesAppURLProvider: { nil }
+        fileIsExecutable: { _ in false }, launchServicesAppURLProvider: { _ in nil },
+        runningApplicationURLsProvider: { [] }
       ),
       notifier: FixedNotificationService(state: .authorized)
     )
@@ -139,7 +175,8 @@ final class ServiceReliabilityTests: XCTestCase {
           await counter.begin()
           return nil
         },
-        fileIsExecutable: { _ in false }, launchServicesAppURLProvider: { nil }
+        fileIsExecutable: { _ in false }, launchServicesAppURLProvider: { _ in nil },
+        runningApplicationURLsProvider: { [] }
       ),
       notifier: FixedNotificationService(state: .authorized)
     )
@@ -221,7 +258,8 @@ final class ServiceReliabilityTests: XCTestCase {
           try? await Task.sleep(nanoseconds: 120_000_000)
           return nil
         },
-        fileIsExecutable: { _ in false }, launchServicesAppURLProvider: { nil }
+        fileIsExecutable: { _ in false }, launchServicesAppURLProvider: { _ in nil },
+        runningApplicationURLsProvider: { [] }
       ),
       notifier: FixedNotificationService(state: .authorized)
     )
