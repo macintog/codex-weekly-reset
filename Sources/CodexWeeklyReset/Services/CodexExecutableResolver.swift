@@ -12,7 +12,8 @@ struct CodexExecutableResolver {
   var commandPathProvider: () async -> String?
   var fileIsExecutable: (String) -> Bool
   var homeDirectory: URL
-  var launchServicesAppURLProvider: () -> URL?
+  var launchServicesAppURLProvider: (String) -> URL?
+  var runningApplicationURLsProvider: () -> [URL]
   var includeFallbacks: Bool
 
   init(
@@ -21,8 +22,17 @@ struct CodexExecutableResolver {
     fileIsExecutable: @escaping (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
     homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
     includeFallbacks: Bool = true,
-    launchServicesAppURLProvider: @escaping () -> URL? = {
-      NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex")
+    launchServicesAppURLProvider: @escaping (String) -> URL? = {
+      NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)
+    },
+    runningApplicationURLsProvider: @escaping () -> [URL] = {
+      NSWorkspace.shared.runningApplications.compactMap { application in
+        let supportedNames = ["ChatGPT", "Codex"]
+        guard supportedNames.contains(application.localizedName ?? "")
+          || supportedNames.map({ "\($0).app" }).contains(application.bundleURL?.lastPathComponent ?? "")
+        else { return nil }
+        return application.bundleURL
+      }
     }
   ) {
     self.configuredPath = configuredPath
@@ -31,6 +41,7 @@ struct CodexExecutableResolver {
     self.homeDirectory = homeDirectory
     self.includeFallbacks = includeFallbacks
     self.launchServicesAppURLProvider = launchServicesAppURLProvider
+    self.runningApplicationURLsProvider = runningApplicationURLsProvider
   }
 
   func resolve() async -> CodexExecutable? {
@@ -43,30 +54,61 @@ struct CodexExecutableResolver {
       return nil
     }
 
+    for appURL in [
+      URL(fileURLWithPath: "/Applications/ChatGPT.app"),
+      URL(fileURLWithPath: "/Applications/Codex.app")
+    ] {
+      if let path = bundledExecutable(in: appURL) {
+        return CodexExecutable(path: path, source: "/Applications")
+      }
+    }
+
+    for appName in ["ChatGPT.app", "Codex.app"] {
+      let appURL = homeDirectory
+        .appendingPathComponent("Applications", isDirectory: true)
+        .appendingPathComponent(appName, isDirectory: true)
+      if let path = bundledExecutable(in: appURL) {
+        return CodexExecutable(path: path, source: "~/Applications")
+      }
+    }
+
+    // The installed ChatGPT app currently registers this bundle identifier.
+    // Launch Services resolves it even when the user moves the app outside the
+    // conventional Applications folders.
+    if let appURL = launchServicesAppURLProvider("com.openai.codex"),
+       let path = bundledExecutable(in: appURL) {
+      return CodexExecutable(path: path, source: "LaunchServices")
+    }
+
+    // A running supported app supplies its exact bundle URL even if it is not
+    // registered or lives outside a conventional Applications folder.
+    for appURL in runningApplicationURLsProvider() {
+      if let path = bundledExecutable(in: appURL) {
+        return CodexExecutable(path: path, source: "LaunchServices")
+      }
+    }
+
+    // Prefer the CLI inside the installed app over a PATH shim. App bundle
+    // layouts can move during an update while an older shim remains executable
+    // but points at the removed location.
     if let commandPath = await commandPathProvider(),
        fileIsExecutable(commandPath) {
       return CodexExecutable(path: commandPath, source: "PATH")
     }
 
-    let applicationPath = "/Applications/Codex.app/Contents/Resources/codex"
-    if fileIsExecutable(applicationPath) {
-      return CodexExecutable(path: applicationPath, source: "/Applications")
-    }
+    return nil
+  }
 
-    let userApplicationPath = homeDirectory
-      .appendingPathComponent("Applications/Codex.app/Contents/Resources/codex")
-      .path
-    if fileIsExecutable(userApplicationPath) {
-      return CodexExecutable(path: userApplicationPath, source: "~/Applications")
-    }
-
-    if let appURL = launchServicesAppURLProvider() {
-      let codexPath = appURL.appendingPathComponent("Contents/Resources/codex").path
-      if fileIsExecutable(codexPath) {
-        return CodexExecutable(path: codexPath, source: "LaunchServices")
+  private func bundledExecutable(in appURL: URL) -> String? {
+    for relativePath in [
+      "Contents/Resources/codex-cli/bin/codex",
+      "Contents/Resources/codex"
+    ] {
+      let path = appURL.appendingPathComponent(relativePath).path
+      if fileIsExecutable(path) {
+        return path
       }
     }
-
     return nil
   }
 
