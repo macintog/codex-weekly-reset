@@ -6,25 +6,25 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Codex Weekly Reset</title>
         <item>
-            <title>0.1.7</title>
-            <pubDate>Thu, 24 Sep 2026 20:20:49 -0400</pubDate>
+            <title>0.1.8</title>
+            <pubDate>Tue, 29 Sep 2026 08:54:10 -0400</pubDate>
             <link>https://macintog.github.io/codex-weekly-reset/</link>
-            <sparkle:version>142</sparkle:version>
-            <sparkle:shortVersionString>0.1.7</sparkle:shortVersionString>
+            <sparkle:version>144</sparkle:version>
+            <sparkle:shortVersionString>0.1.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description><![CDATA[<h1>Codex Weekly Reset 0.1.7</h1>
+            <description><![CDATA[<h1>Codex Weekly Reset 0.1.8</h1>
 <ul>
-  <li><strong>0.1.7:</strong> See clear reset dates, neutral empty icon outlines, and a menu bar window that fits its contents.</li>
+  <li><strong>0.1.8:</strong> Keep seeing your live Codex limits after updating the ChatGPT app.</li>
 </ul>
 ]]></description>
-            <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset-v0.1.7-b142.zip" length="3584032" type="application/octet-stream" sparkle:edSignature="a4VvIh5BuzUuAVx+1bPIgYMQSh2mszn9BRXyD7hxS1O3edC0CCthJMAtgE+gpW6jm1ChlB/zBIB70u+AGVHQAg=="/>
+            <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/CodexWeeklyReset-v0.1.8-b144.zip" length="3586509" type="application/octet-stream" sparkle:edSignature="xtfh/Dofb8RJ0lQTcOzjgHh4ah8YprXoyXOw5T4bQNFmnAHepYktzmCDVdEQe2EAjtxf1dJ6PnEJ5fYuMxIoBw=="/>
             <sparkle:deltas>
-                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-136.delta" sparkle:deltaFrom="136" length="164578" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="6b51r258aR93Sh10vuqXhAeCKfbKKM9p7NA+6jCm/qjcHKwni6DXEoXnhUeMt5KyQ+n2xE7eehb2D6M6KEKhBQ=="/>
-                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-130.delta" sparkle:deltaFrom="130" length="224182" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="a4CKxKTbMfuEq8dOsIqLrgflqKcYeZp9R7ZmuWSeEOct67o/YNMc+dWxF0qep4nhsOX7YqsVKABjPZgqc5nCBA=="/>
-                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-128.delta" sparkle:deltaFrom="128" length="229322" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Gg+oui7jMCPXwlCpckg7hfuj/qjNug7BUiOm+RLxFU0nKJljVvq/zQOZwIetlvwp1zyl+E1PK8Z0UAB+kQDkCg=="/>
-                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-126.delta" sparkle:deltaFrom="126" length="233042" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ZGTcZXJsk8dmquIF7NulLAW00f22q5sqsELOWdUzfA5axD1P3fYiwJitIoSIUJJfSvQ0ZZg0kHga3tfD+cXzCw=="/>
-                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset142-123.delta" sparkle:deltaFrom="123" length="232158" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="jFH/H49i1ALM2q4mdjiHXX7rcDp/o8mNfXT35ns4CiwjCj9sEaJGkua0cyflUS1UNyFL0oE0WAWKqZHK3XkBDA=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset144-136.delta" sparkle:deltaFrom="136" length="177258" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Zp806r71LBp9ZmTCuFF0z38pgIdycnw2K30p7U8CZKaMjTkWrhqZ9/Y4Fv2a1TLDYS5wjKJZv9mJjmIF+s2mDQ=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset144-130.delta" sparkle:deltaFrom="130" length="227898" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="ViMMtpm3QA8t8lSgCsx4frkHlJ+u8YZBr5eItJcQ0dW6aTyRjctTDg7dTkJEaeVMw5I/z27JKPfZsysDrqa6CA=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset144-128.delta" sparkle:deltaFrom="128" length="234494" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="HCD4q6S1AijR8j4T/AmTTFwkFFGTnDMASX3pE6DbXGZtygq40gM6zNbcEpx26OB2XmBwKRrfTKmgIg3cm6NuBg=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset144-126.delta" sparkle:deltaFrom="126" length="241270" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="eOPB7KgTeBWZnqbUOhPQiqbmVxS1uNwNbLeFtBnMLIjqBQRRmfKnoyU/QJTcCQSU/4HwtmN6/qD4rbfa26zvDQ=="/>
+                <enclosure url="https://macintog.github.io/codex-weekly-reset/downloads/Codex%20Weekly%20Reset144-123.delta" sparkle:deltaFrom="123" length="241610" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="fKE1qnLDgpwTdfFA8b1Ixrot/AQ/EHZkaiwHRTHPL9YZZNA06blMizcueTeVtuzEe7RbuZmwsXAWOKGkOj58Dg=="/>
             </sparkle:deltas>
         </item>
         <item>
@@ -73,6 +73,6 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: LnPfquCv09XQc+7POb3YPdkj000yvO86EtfjJ3Tzz9pVcWUxN+okSLeX0uJAkJcrhOW+smxyxvHpazQ3OeXeBA==
-length: 9291
+edSignature: FhoZPbSpSw/AAOKvOv4/Hlj1VGotED0D5zE4O7+AexYCTXfQpuY12iHk2TKsr47qPgXsC239NMJTeCucPdKHAg==
+length: 9260
 -->
