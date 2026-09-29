@@ -17,6 +17,7 @@ actor CodexAppServerClient {
   private var updateHandler: ((RateLimitUpdate) -> Void)?
   private var stdoutBuffer = Data()
   private var stderrTail = Data()
+  private var outputCloseTask: Task<Void, Never>?
   private let maxStderrTailBytes = 8 * 1024
 
   init(executablePath: String, requestTimeout: TimeInterval = 8) {
@@ -85,6 +86,8 @@ actor CodexAppServerClient {
   }
 
   func stop() {
+    outputCloseTask?.cancel()
+    outputCloseTask = nil
     stdoutHandle?.readabilityHandler = nil
     stderrHandle?.readabilityHandler = nil
     inputHandle?.closeFile()
@@ -170,6 +173,9 @@ actor CodexAppServerClient {
   private func installReadabilityHandlers(stdout: FileHandle, stderr: FileHandle) {
     stdout.readabilityHandler = { [weak self] handle in
       let data = handle.availableData
+      if data.isEmpty {
+        handle.readabilityHandler = nil
+      }
       Task {
         await self?.consumeStdout(data)
       }
@@ -177,6 +183,9 @@ actor CodexAppServerClient {
 
     stderr.readabilityHandler = { [weak self] handle in
       let data = handle.availableData
+      if data.isEmpty {
+        handle.readabilityHandler = nil
+      }
       Task {
         await self?.consumeStderr(data)
       }
@@ -186,7 +195,7 @@ actor CodexAppServerClient {
   private func consumeStdout(_ data: Data) {
     guard !data.isEmpty else {
       logger.error("Codex app-server stdout closed")
-      failPending(CodexAppServerError.outputClosed)
+      scheduleOutputClosedFailure()
       return
     }
 
@@ -219,9 +228,25 @@ actor CodexAppServerClient {
   }
 
   private func processDidExit(status: Int32) {
+    outputCloseTask?.cancel()
+    outputCloseTask = nil
     let stderr = String(data: stderrTail, encoding: .utf8)
     logger.error("Codex app-server exited with status \(status, privacy: .public)")
     failPending(CodexAppServerError.processExited(status, stderr: stderr))
+  }
+
+  private func scheduleOutputClosedFailure() {
+    guard outputCloseTask == nil else { return }
+    outputCloseTask = Task { [weak self] in
+      try? await Task.sleep(nanoseconds: 50_000_000)
+      guard !Task.isCancelled else { return }
+      await self?.failForClosedOutput()
+    }
+  }
+
+  private func failForClosedOutput() {
+    outputCloseTask = nil
+    failPending(CodexAppServerError.outputClosed)
   }
 
   private func handleLine(_ line: Data) {

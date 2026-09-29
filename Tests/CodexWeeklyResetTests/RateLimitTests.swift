@@ -669,6 +669,27 @@ final class RateLimitTests: XCTestCase {
     XCTAssertEqual(error.localizedDescription, "Codex app-server exited with status 64: invalid auth token")
   }
 
+  func testAppServerClientReportsProcessExitInsteadOfPipeClosure() async throws {
+    let executable = try temporaryExecutable("""
+    #!/bin/sh
+    echo 'bundled CLI moved' >&2
+    exit 127
+    """)
+
+    let client = CodexAppServerClient(executablePath: executable.path, requestTimeout: 2)
+    defer { Task { await client.stop() } }
+
+    do {
+      _ = try await client.readRateLimits()
+      XCTFail("Expected app-server exit")
+    } catch {
+      XCTAssertEqual(
+        error.localizedDescription,
+        "Codex app-server exited with status 127: bundled CLI moved"
+      )
+    }
+  }
+
   func testAppServerClientReadsRateLimitsFromInteractiveServer() async throws {
     let executable = try temporaryExecutable("""
     #!/usr/bin/env python3

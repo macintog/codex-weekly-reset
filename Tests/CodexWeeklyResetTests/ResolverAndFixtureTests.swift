@@ -20,14 +20,34 @@ final class ResolverAndFixtureTests: XCTestCase {
     )
   }
 
-  func testResolverFallsBackToApplicationsBeforeLaunchServices() async {
+  func testResolverPrefersCurrentApplicationBundleLayoutOverPathShim() async {
+    let resolver = CodexExecutableResolver(
+      configuredPath: nil,
+      commandPathProvider: { "/Users/test/.local/bin/codex" },
+      fileIsExecutable: { path in
+        path == "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
+          || path == "/Users/test/.local/bin/codex"
+      },
+      homeDirectory: URL(fileURLWithPath: "/Users/test"),
+      includeFallbacks: true,
+      launchServicesAppURLProvider: { nil }
+    )
+
+    let result = await resolver.resolve()
+    XCTAssertEqual(
+      result,
+      CodexExecutable(
+        path: "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+        source: "/Applications"
+      )
+    )
+  }
+
+  func testResolverSupportsLegacyLaunchServicesBundleLayout() async {
     let resolver = CodexExecutableResolver(
       configuredPath: nil,
       commandPathProvider: { nil },
-      fileIsExecutable: { path in
-        path == "/Applications/Codex.app/Contents/Resources/codex"
-          || path == "/Resolved/Codex.app/Contents/Resources/codex"
-      },
+      fileIsExecutable: { $0 == "/Resolved/Codex.app/Contents/Resources/codex" },
       homeDirectory: URL(fileURLWithPath: "/Users/test"),
       includeFallbacks: true,
       launchServicesAppURLProvider: { URL(fileURLWithPath: "/Resolved/Codex.app") }
@@ -36,7 +56,7 @@ final class ResolverAndFixtureTests: XCTestCase {
     let result = await resolver.resolve()
     XCTAssertEqual(
       result,
-      CodexExecutable(path: "/Applications/Codex.app/Contents/Resources/codex", source: "/Applications")
+      CodexExecutable(path: "/Resolved/Codex.app/Contents/Resources/codex", source: "LaunchServices")
     )
   }
 
